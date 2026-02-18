@@ -1,7 +1,9 @@
 import asyncio
 import signal
 import sys
+from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import Any
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -31,6 +33,15 @@ from super_system.message_board import (
     MessageBoard,
     build_message_board_server,
 )
+
+
+async def _as_stream(text: str) -> AsyncIterator[dict[str, Any]]:
+    yield {
+        "type": "user",
+        "message": {"role": "user", "content": text},
+        "parent_tool_use_id": None,
+        "session_id": "",
+    }
 
 
 async def run(
@@ -81,7 +92,9 @@ async def run(
         options.debug_stderr = sys.stderr
 
     try:
-        async for message in query(prompt=orchestrator_prompt, options=options):
+        async for message in query(
+            prompt=_as_stream(orchestrator_prompt), options=options
+        ):
             if isinstance(message, AssistantMessage):
                 for block in message.content:
                     if isinstance(block, TextBlock):
@@ -108,6 +121,16 @@ async def run(
     except KeyboardInterrupt:
         print_interrupted()
         raise SystemExit(130)
+    except BaseExceptionGroup as eg:
+        cancelled, real = eg.split(
+            lambda e: isinstance(e, (asyncio.CancelledError, KeyboardInterrupt))
+        )
+        if real is None:
+            print_interrupted()
+            raise SystemExit(130)
+        for exc in real.exceptions:
+            print_error(f"{type(exc).__name__}: {exc}")
+        raise SystemExit(1) from real
     except Exception as exc:
         print_error(str(exc) or type(exc).__name__)
         raise SystemExit(1) from exc

@@ -66,6 +66,16 @@ def main() -> None:
         raise SystemExit(130)
     except SystemExit as exc:
         raise exc
+    except BaseExceptionGroup as eg:
+        _, real = eg.split(
+            lambda e: isinstance(e, (asyncio.CancelledError, KeyboardInterrupt))
+        )
+        if real is None:
+            print_interrupted()
+            raise SystemExit(130)
+        for sub in real.exceptions:
+            print_error(f"{type(sub).__name__}: {sub}")
+        raise SystemExit(1) from real
     except Exception as exc:
         print_error(str(exc) or type(exc).__name__)
         raise SystemExit(1) from exc

@@ -61,6 +61,23 @@ uv run python -m super_system "Build something"
 
 An orchestrator agent acts as a demanding tech lead, driving 12 specialist subagents through a strict development lifecycle. The system does not stop after the first working version -- it keeps iterating autonomously, adding features, fixing issues, and polishing until the product is exceptional.
 
+### Inter-agent communication
+
+Agents communicate through a shared **message board** -- an in-process MCP server that provides six tools available to every agent:
+
+| Tool | Purpose |
+|---|---|
+| `send_message` | Post a question, answer, info update, or action request to another agent (or broadcast to all) |
+| `read_messages` | Read messages directed to you or broadcast -- agents check this at task startup |
+| `read_thread` | Follow a conversation thread by ID |
+| `share_artifact` | Store a named output (spec, report, findings) for other agents to pull on demand |
+| `get_artifact` | Retrieve a shared artifact by name |
+| `list_artifacts` | List all available artifacts |
+
+This means agents don't rely solely on the orchestrator to relay context. The researcher shares its brief as an artifact, the architect shares its spec, the reviewer shares feedback -- and downstream agents pull exactly what they need. Agents can also ask each other direct questions, flag blockers, and coordinate dependencies through messages.
+
+The orchestrator still coordinates the overall lifecycle and routes unanswered questions, but the message board reduces context loss and enables richer collaboration.
+
 ### Agents
 
 | Agent | Role | Access |
@@ -105,7 +122,8 @@ super-system/
     ├── __init__.py
     ├── __main__.py          # python -m super_system
     ├── cli.py               # argparse, logging, main()
-    ├── orchestrator.py      # run(), message streaming
+    ├── orchestrator.py      # run(), message streaming, board wiring
     ├── agents.py            # 12 agent definitions (tools, models)
-    └── prompts.py           # all prompt constants
+    ├── prompts.py           # all prompt constants
+    └── message_board.py     # shared message board + MCP tools
 ```

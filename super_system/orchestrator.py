@@ -17,12 +17,19 @@ from super_system import prompts
 from super_system.agents import build_agents
 from super_system.console import (
     print_agent_dispatch,
+    print_artifact_shared,
     print_banner,
     print_error,
     print_interrupted,
+    print_message_activity,
     print_result,
     print_system,
     print_text,
+)
+from super_system.message_board import (
+    COMMS_TOOLS,
+    MessageBoard,
+    build_message_board_server,
 )
 
 
@@ -48,13 +55,22 @@ async def run(
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, _handle_signal, sig)
 
+    board = MessageBoard()
+    board.on_message(print_message_activity)
+    board.on_artifact(
+        lambda owner, key, _content: print_artifact_shared(owner, key)
+    )
+
+    mcp_server = build_message_board_server(board)
+
     agents = build_agents()
 
     orchestrator_prompt = f"{prompts.ORCHESTRATOR}\n\nUSER REQUEST:\n{prompt}"
 
     options = ClaudeAgentOptions(
-        allowed_tools=["Task", "Read", "Grep", "Glob"],
+        allowed_tools=["Task", "Read", "Grep", "Glob"] + COMMS_TOOLS,
         agents=agents,
+        mcp_servers={"message-board": mcp_server},
         permission_mode="bypassPermissions",
     )
 

@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
+
+if TYPE_CHECKING:
+    from super_system.message_board import Message
 
 AGENT_STYLES: dict[str, str] = {
     "researcher": "bright_cyan",
@@ -108,3 +113,38 @@ def print_interrupted() -> None:
 def print_error(message: str) -> None:
     err_console.print()
     err_console.print(f"[error]✗ {message}[/error]")
+
+
+_MSG_KIND_STYLE: dict[str, str] = {
+    "question": "bold bright_yellow",
+    "answer": "bold bright_green",
+    "info": "bold bright_cyan",
+    "request": "bold bright_magenta",
+}
+
+
+def print_message_activity(msg: Message) -> None:
+    sender_color = AGENT_STYLES.get(msg.from_agent, "white")
+    receiver_color = AGENT_STYLES.get(msg.to_agent, "white")
+    kind_style = _MSG_KIND_STYLE.get(msg.kind, "dim")
+
+    label = Text.assemble(
+        ("  ✉ ", kind_style),
+        (msg.from_agent, f"bold {sender_color}"),
+        (" → ", "dim"),
+        (msg.to_agent, f"bold {receiver_color}"),
+        (f"  [{msg.kind}] ", kind_style),
+        (msg.subject, "dim"),
+    )
+    err_console.print(label)
+
+
+def print_artifact_shared(owner: str, key: str) -> None:
+    owner_color = AGENT_STYLES.get(owner, "white")
+    label = Text.assemble(
+        ("  ◆ ", "bold bright_cyan"),
+        (owner, f"bold {owner_color}"),
+        (" shared artifact ", "dim"),
+        (key, "bold white"),
+    )
+    err_console.print(label)

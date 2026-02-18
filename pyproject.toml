@@ -1,0 +1,16 @@
+[project]
+name = "super-system"
+version = "0.1.0"
+description = "Multi-agent software engineering team powered by Claude"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "claude-agent-sdk>=0.1.37",
+]
+
+[project.scripts]
+super-system = "super_system.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -13,7 +13,7 @@ def build_agents() -> dict[str, AgentDefinition]:
             ),
             prompt=prompts.RESEARCHER,
             tools=["WebSearch", "WebFetch", "Read", "Grep", "Glob"],
-            model="sonnet",
+            # model="sonnet",
         ),
         "architect": AgentDefinition(
             description=(
@@ -24,7 +24,7 @@ def build_agents() -> dict[str, AgentDefinition]:
             ),
             prompt=prompts.ARCHITECT,
             tools=["Read", "Grep", "Glob"],
-            model="opus",
+            # model="opus",
         ),
         "backend-coder": AgentDefinition(
             description=(
@@ -34,7 +34,7 @@ def build_agents() -> dict[str, AgentDefinition]:
             ),
             prompt=prompts.BACKEND_CODER,
             tools=["Read", "Write", "Edit", "Bash", "Grep", "Glob"],
-            model="sonnet",
+            # model="sonnet",
         ),
         "frontend-coder": AgentDefinition(
             description=(
@@ -44,7 +44,7 @@ def build_agents() -> dict[str, AgentDefinition]:
             ),
             prompt=prompts.FRONTEND_CODER,
             tools=["Read", "Write", "Edit", "Bash", "Grep", "Glob"],
-            model="sonnet",
+            # model="sonnet",
         ),
         "infra-coder": AgentDefinition(
             description=(
@@ -54,7 +54,7 @@ def build_agents() -> dict[str, AgentDefinition]:
             ),
             prompt=prompts.INFRA_CODER,
             tools=["Read", "Write", "Edit", "Bash", "Grep", "Glob"],
-            model="sonnet",
+            # model="sonnet",
         ),
         "reviewer": AgentDefinition(
             description=(
@@ -65,7 +65,7 @@ def build_agents() -> dict[str, AgentDefinition]:
             ),
             prompt=prompts.REVIEWER,
             tools=["Read", "Grep", "Glob"],
-            model="opus",
+            # model="opus",
         ),
         "tester": AgentDefinition(
             description=(
@@ -76,7 +76,7 @@ def build_agents() -> dict[str, AgentDefinition]:
             ),
             prompt=prompts.TESTER,
             tools=["Bash", "Read", "Write", "Edit", "Grep", "Glob"],
-            model="sonnet",
+            # model="sonnet",
         ),
         "security-auditor": AgentDefinition(
             description=(
@@ -87,7 +87,7 @@ def build_agents() -> dict[str, AgentDefinition]:
             ),
             prompt=prompts.SECURITY_AUDITOR,
             tools=["Read", "Grep", "Glob", "Bash"],
-            model="opus",
+            # model="opus",
         ),
         "doc-writer": AgentDefinition(
             description=(
@@ -97,6 +97,6 @@ def build_agents() -> dict[str, AgentDefinition]:
             ),
             prompt=prompts.DOC_WRITER,
             tools=["Read", "Write", "Edit", "Grep", "Glob"],
-            model="sonnet",
+            # model="sonnet",
         ),
     }

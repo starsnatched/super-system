@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 
 from rich.console import Console
@@ -27,35 +28,70 @@ AGENT_STYLES: dict[str, str] = {
     "ux-analyst": "plum2",
 }
 
+_SYSTEM_SUBTYPE_STYLES: dict[str, tuple[str, str]] = {
+    "tool_use": ("🔧", "cyan"),
+    "tool_result": ("📦", "green"),
+    "model_request": ("🧠", "magenta"),
+    "model_response": ("💬", "blue"),
+    "error": ("✗", "bright_red"),
+    "rate_limit": ("⏳", "yellow"),
+    "retry": ("↻", "yellow"),
+}
+
+_MSG_KIND_ICONS: dict[str, tuple[str, str]] = {
+    "question": ("?", "bold bright_yellow"),
+    "answer": ("✓", "bold bright_green"),
+    "info": ("i", "bold bright_cyan"),
+    "request": ("!", "bold bright_magenta"),
+}
+
 THEME = Theme(
     {
         "agent.name": "bold",
         "agent.desc": "dim",
         "info": "dim cyan",
         "success": "bold green",
+        "warning": "bold yellow",
         "error": "bold red",
         "metric.label": "dim",
         "metric.value": "bold white",
+        "ts": "dim green",
     }
 )
 
 console = Console(theme=THEME, highlight=False)
 err_console = Console(theme=THEME, stderr=True, highlight=False)
 
+_t0 = time.monotonic()
+
+
+def _ts() -> str:
+    elapsed = time.monotonic() - _t0
+    mins, secs = divmod(int(elapsed), 60)
+    return f"{mins:02d}:{secs:02d}"
+
 
 def print_banner() -> None:
-    banner = Text.assemble(
-        ("⚡ ", "bright_yellow"),
-        ("super-system", "bold bright_white"),
-        ("  multi-agent engineering team", "dim"),
+    err_console.print()
+    err_console.print(
+        Panel(
+            Text.assemble(
+                ("⚡ ", "bright_yellow"),
+                ("super-system", "bold bright_white"),
+                ("  multi-agent engineering team", "dim"),
+            ),
+            border_style="bright_blue",
+            expand=False,
+            padding=(0, 2),
+        )
     )
-    console.print(banner)
-    console.print()
+    err_console.print()
 
 
 def print_agent_dispatch(agent_name: str, description: str = "") -> None:
     color = AGENT_STYLES.get(agent_name, "white")
     label = Text.assemble(
+        (f"  {_ts()} ", "ts"),
         ("▸ ", f"bold {color}"),
         (agent_name, f"bold {color}"),
     )
@@ -102,12 +138,20 @@ def print_result(
 
 
 def print_system(subtype: str, data: object) -> None:
-    err_console.print(f"[dim]  system/{subtype}:[/dim] [dim]{data}[/dim]")
+    icon, color = _SYSTEM_SUBTYPE_STYLES.get(subtype, ("•", "dim"))
+    label = Text.assemble(
+        (f"  {_ts()} ", "ts"),
+        (f"{icon} ", color),
+        (subtype, f"bold {color}"),
+        ("  ", ""),
+        (str(data), "dim"),
+    )
+    err_console.print(label)
 
 
 def print_interrupted() -> None:
     err_console.print()
-    err_console.print("[bold yellow]⚠ Interrupted[/bold yellow]")
+    err_console.print("[warning]⚠ Interrupted[/warning]")
 
 
 def print_error(message: str) -> None:
@@ -115,21 +159,14 @@ def print_error(message: str) -> None:
     err_console.print(f"[error]✗ {message}[/error]")
 
 
-_MSG_KIND_STYLE: dict[str, str] = {
-    "question": "bold bright_yellow",
-    "answer": "bold bright_green",
-    "info": "bold bright_cyan",
-    "request": "bold bright_magenta",
-}
-
-
 def print_message_activity(msg: Message) -> None:
     sender_color = AGENT_STYLES.get(msg.from_agent, "white")
     receiver_color = AGENT_STYLES.get(msg.to_agent, "white")
-    kind_style = _MSG_KIND_STYLE.get(msg.kind, "dim")
+    icon, kind_style = _MSG_KIND_ICONS.get(msg.kind, ("•", "dim"))
 
     label = Text.assemble(
-        ("  ✉ ", kind_style),
+        (f"  {_ts()} ", "ts"),
+        (f"  {icon} ", kind_style),
         (msg.from_agent, f"bold {sender_color}"),
         (" → ", "dim"),
         (msg.to_agent, f"bold {receiver_color}"),
@@ -142,6 +179,7 @@ def print_message_activity(msg: Message) -> None:
 def print_artifact_shared(owner: str, key: str) -> None:
     owner_color = AGENT_STYLES.get(owner, "white")
     label = Text.assemble(
+        (f"  {_ts()} ", "ts"),
         ("  ◆ ", "bold bright_cyan"),
         (owner, f"bold {owner_color}"),
         (" shared artifact ", "dim"),

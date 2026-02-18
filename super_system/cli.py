@@ -6,7 +6,7 @@ from pathlib import Path
 
 from rich.logging import RichHandler
 
-from super_system.console import print_error, print_interrupted
+from super_system.console import err_console, print_error, print_interrupted
 from super_system.orchestrator import run
 
 
@@ -51,6 +51,7 @@ def main() -> None:
         datefmt="[%X]",
         handlers=[
             RichHandler(
+                console=err_console,
                 rich_tracebacks=True,
                 show_path=False,
                 markup=True,

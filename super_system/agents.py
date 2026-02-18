@@ -99,4 +99,39 @@ def build_agents() -> dict[str, AgentDefinition]:
             tools=["Read", "Write", "Edit", "Grep", "Glob"],
             # model="sonnet",
         ),
+        "product-manager": AgentDefinition(
+            description=(
+                "Product manager. Use to evaluate the built product against the "
+                "original request and produce a prioritized improvement backlog. "
+                "Returns SHIP_READY or IMPROVEMENTS_NEEDED with a ranked list "
+                "of features, bugfixes, UX issues, and polish items. Use after "
+                "the ship-ready gate to drive continuous improvement. Read-only "
+                "with Bash to run the application."
+            ),
+            prompt=prompts.PRODUCT_MANAGER,
+            tools=["Read", "Grep", "Glob", "Bash"],
+            # model="opus",
+        ),
+        "performance-optimizer": AgentDefinition(
+            description=(
+                "Performance engineer. Use to profile code, run benchmarks, "
+                "identify bottlenecks, and recommend optimizations. Reports "
+                "issues ranked by impact with specific fix recommendations. "
+                "Has Bash for running profiling and benchmarking tools."
+            ),
+            prompt=prompts.PERFORMANCE_OPTIMIZER,
+            tools=["Read", "Grep", "Glob", "Bash"],
+            # model="sonnet",
+        ),
+        "ux-analyst": AgentDefinition(
+            description=(
+                "UX and accessibility analyst. Use to review UI components for "
+                "WCAG compliance, usability, responsive design, keyboard "
+                "navigation, and visual polish. Returns CLEAN or ISSUES_FOUND "
+                "with a severity-rated report. Read-only."
+            ),
+            prompt=prompts.UX_ANALYST,
+            tools=["Read", "Grep", "Glob"],
+            # model="opus",
+        ),
     }

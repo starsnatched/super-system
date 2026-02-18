@@ -1,6 +1,6 @@
 # super-system
 
-Multi-agent software engineering team powered by Claude. Describe what you want built and a team of 9 specialist AI agents collaborates through an 8-phase development lifecycle to produce production-ready code.
+Multi-agent software engineering team powered by Claude. Describe what you want built and a team of 12 specialist AI agents collaborates through a 10-phase development lifecycle -- including continuous autonomous improvement -- to produce exceptional, production-ready software.
 
 ## Prerequisites
 
@@ -59,20 +59,41 @@ uv run python -m super_system "Build something"
 
 ## How it works
 
-An orchestrator agent acts as a demanding tech lead, driving 9 specialist subagents through a strict development lifecycle:
+An orchestrator agent acts as a demanding tech lead, driving 12 specialist subagents through a strict development lifecycle. The system does not stop after the first working version -- it keeps iterating autonomously, adding features, fixing issues, and polishing until the product is exceptional.
+
+### Agents
+
+| Agent | Role | Access |
+|---|---|---|
+| `researcher` | Gathers latest docs, libraries, best practices from the web | Read-only |
+| `architect` | Designs system architecture, produces technical specs | Read-only |
+| `product-manager` | Evaluates product, generates prioritized improvement backlog | Read-only + Bash |
+| `backend-coder` | Writes Python backend code, APIs, server logic | Full write |
+| `frontend-coder` | Writes UI components, pages, styles, client-side logic | Full write |
+| `infra-coder` | Writes Dockerfiles, CI/CD, deployment configs, Makefiles | Full write |
+| `reviewer` | Rigorous code review, returns APPROVE or REQUEST_CHANGES | Read-only |
+| `tester` | Writes and runs comprehensive test suites | Full write |
+| `security-auditor` | Scans for vulnerabilities, audits dependencies | Read-only + Bash |
+| `performance-optimizer` | Profiles code, identifies bottlenecks, benchmarks | Read-only + Bash |
+| `ux-analyst` | Reviews UI for accessibility, usability, responsive design | Read-only |
+| `doc-writer` | Produces README, API docs, setup guides | Full write |
+
+### Development lifecycle
 
 | Phase | Agent(s) | What happens |
 |---|---|---|
-| 1. Research | `researcher` | Gathers latest docs, libraries, best practices from the web |
-| 2. Architecture | `architect` | Produces a detailed technical spec (file structure, data models, API contracts) |
+| 1. Research | `researcher` | Gathers latest docs, libraries, best practices |
+| 2. Architecture | `architect` | Produces detailed technical spec |
 | 3. Implementation | `backend-coder`, `frontend-coder`, `infra-coder` | Writes all code following the spec |
 | 4. Code Review | `reviewer` | Reviews code, loops with coders until APPROVE |
-| 5. Testing | `tester` | Writes and runs tests, loops until 100% pass rate |
+| 5. Testing | `tester` | Writes and runs tests, loops until 100% pass |
 | 6. Security Audit | `security-auditor` | Scans for vulnerabilities, loops until clean |
 | 7. Documentation | `doc-writer` | Produces README and API docs |
-| 8. Ship-Ready Gate | `architect` + `reviewer` | Final holistic sign-off, loops back if issues found |
+| 8. Ship-Ready Gate | `architect` + `reviewer` | Holistic sign-off, loops back if issues found |
+| 9. Continuous Improvement | `product-manager`, `performance-optimizer`, `ux-analyst` | Evaluates product, generates backlog, implements improvements in cycles |
+| 10. Final Delivery | `doc-writer` + `tester` | Updates docs, runs final test suite, prints summary |
 
-Every phase has an inner retry loop. The entire lifecycle is wrapped in an outer loop that re-runs phases until both the architect and reviewer approve the final product.
+Every phase has an inner retry loop. Phase 8 wraps the initial build in an outer loop. Phase 9 is an autonomous improvement loop that keeps iterating -- the product manager evaluates, the performance optimizer profiles, the UX analyst reviews, and then coders implement improvements -- until the product manager declares the product ship-ready or 5 improvement cycles complete.
 
 ## Project structure
 
@@ -85,6 +106,6 @@ super-system/
     ├── __main__.py          # python -m super_system
     ├── cli.py               # argparse, logging, main()
     ├── orchestrator.py      # run(), message streaming
-    ├── agents.py            # 9 agent definitions (tools, models)
+    ├── agents.py            # 12 agent definitions (tools, models)
     └── prompts.py           # all prompt constants
 ```

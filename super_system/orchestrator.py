@@ -1,4 +1,5 @@
-import logging
+import asyncio
+import signal
 import sys
 from pathlib import Path
 
@@ -14,8 +15,15 @@ from claude_agent_sdk import (
 
 from super_system import prompts
 from super_system.agents import build_agents
-
-logger = logging.getLogger(__name__)
+from super_system.console import (
+    print_agent_dispatch,
+    print_banner,
+    print_error,
+    print_interrupted,
+    print_result,
+    print_system,
+    print_text,
+)
 
 
 async def run(
@@ -24,6 +32,22 @@ async def run(
     cwd: Path | None = None,
     verbose: bool = False,
 ) -> None:
+    print_banner()
+
+    loop = asyncio.get_running_loop()
+    interrupted = False
+
+    def _handle_signal(sig: int, _frame: object = None) -> None:
+        nonlocal interrupted
+        if interrupted:
+            raise SystemExit(128 + sig)
+        interrupted = True
+        for task in asyncio.all_tasks(loop):
+            task.cancel()
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, _handle_signal, sig)
+
     agents = build_agents()
 
     orchestrator_prompt = f"{prompts.ORCHESTRATOR}\n\nUSER REQUEST:\n{prompt}"
@@ -32,7 +56,6 @@ async def run(
         allowed_tools=["Task", "Read", "Grep", "Glob"],
         agents=agents,
         permission_mode="bypassPermissions",
-        model="claude-opus-4-20250514",
     )
 
     if cwd is not None:
@@ -41,25 +64,34 @@ async def run(
     if verbose:
         options.debug_stderr = sys.stderr
 
-    async for message in query(prompt=orchestrator_prompt, options=options):
-        if isinstance(message, AssistantMessage):
-            for block in message.content:
-                if isinstance(block, TextBlock):
-                    print(block.text, flush=True)
-                elif isinstance(block, ToolUseBlock):
-                    logger.info("Agent dispatch: %s", block.name)
-                    if verbose and isinstance(block.input, dict):
-                        desc = block.input.get("description", "")
-                        if desc:
-                            logger.info("  -> %s", desc)
-        elif isinstance(message, ResultMessage):
-            logger.info(
-                "Session complete | turns=%d cost=$%.4f duration=%dms",
-                message.num_turns,
-                message.total_cost_usd or 0,
-                message.duration_ms,
-            )
-            if message.is_error:
-                logger.error("Session ended with error: %s", message.result)
-        elif isinstance(message, SystemMessage):
-            logger.debug("System [%s]: %s", message.subtype, message.data)
+    try:
+        async for message in query(prompt=orchestrator_prompt, options=options):
+            if isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        print_text(block.text)
+                    elif isinstance(block, ToolUseBlock):
+                        desc = ""
+                        if isinstance(block.input, dict):
+                            desc = block.input.get("description", "")
+                        print_agent_dispatch(block.name, desc)
+            elif isinstance(message, ResultMessage):
+                print_result(
+                    num_turns=message.num_turns,
+                    cost_usd=message.total_cost_usd or 0,
+                    duration_ms=message.duration_ms,
+                    is_error=message.is_error,
+                    error_text=str(message.result) if message.is_error else "",
+                )
+            elif isinstance(message, SystemMessage):
+                if verbose:
+                    print_system(message.subtype, message.data)
+    except asyncio.CancelledError:
+        print_interrupted()
+        raise SystemExit(130)
+    except KeyboardInterrupt:
+        print_interrupted()
+        raise SystemExit(130)
+    except Exception as exc:
+        print_error(str(exc) or type(exc).__name__)
+        raise SystemExit(1) from exc

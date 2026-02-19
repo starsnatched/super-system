@@ -23,7 +23,7 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
             "gate. Read-only -- cannot modify files."
         ),
         prompts.ARCHITECT,
-        ["Read", "Grep", "Glob"],
+        ["WebSearch", "WebFetch", "Read", "Grep", "Glob"],
     ),
     (
         "backend-coder",
@@ -33,7 +33,7 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
             "write access and can run commands."
         ),
         prompts.BACKEND_CODER,
-        ["Read", "Write", "Edit", "Bash", "Grep", "Glob"],
+        ["WebSearch", "WebFetch", "Read", "Write", "Edit", "Bash", "Grep", "Glob"],
     ),
     (
         "frontend-coder",
@@ -43,7 +43,7 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
             "can run commands."
         ),
         prompts.FRONTEND_CODER,
-        ["Read", "Write", "Edit", "Bash", "Grep", "Glob"],
+        ["WebSearch", "WebFetch", "Read", "Write", "Edit", "Bash", "Grep", "Glob"],
     ),
     (
         "infra-coder",
@@ -53,7 +53,7 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
             "setup. Has full write access and can run commands."
         ),
         prompts.INFRA_CODER,
-        ["Read", "Write", "Edit", "Bash", "Grep", "Glob"],
+        ["WebSearch", "WebFetch", "Read", "Write", "Edit", "Bash", "Grep", "Glob"],
     ),
     (
         "reviewer",
@@ -64,7 +64,7 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
             "final sign-off during the ship-ready gate. Read-only."
         ),
         prompts.REVIEWER,
-        ["Read", "Grep", "Glob"],
+        ["WebSearch", "WebFetch", "Read", "Grep", "Glob"],
     ),
     (
         "tester",
@@ -75,7 +75,7 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
             "test files and run commands."
         ),
         prompts.TESTER,
-        ["Bash", "Read", "Write", "Edit", "Grep", "Glob"],
+        ["WebSearch", "WebFetch", "Bash", "Read", "Write", "Edit", "Grep", "Glob"],
     ),
     (
         "security-auditor",
@@ -86,7 +86,7 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
             "Bash for running audit commands."
         ),
         prompts.SECURITY_AUDITOR,
-        ["Read", "Grep", "Glob", "Bash"],
+        ["WebSearch", "WebFetch", "Read", "Grep", "Glob", "Bash"],
     ),
     (
         "doc-writer",
@@ -96,7 +96,7 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
             "update documentation files."
         ),
         prompts.DOC_WRITER,
-        ["Read", "Write", "Edit", "Grep", "Glob"],
+        ["WebSearch", "WebFetch", "Read", "Write", "Edit", "Grep", "Glob"],
     ),
     (
         "product-manager",
@@ -109,7 +109,7 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
             "with Bash to run the application."
         ),
         prompts.PRODUCT_MANAGER,
-        ["Read", "Grep", "Glob", "Bash"],
+        ["WebSearch", "WebFetch", "Read", "Grep", "Glob", "Bash"],
     ),
     (
         "performance-optimizer",
@@ -120,7 +120,7 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
             "Has Bash for running profiling and benchmarking tools."
         ),
         prompts.PERFORMANCE_OPTIMIZER,
-        ["Read", "Grep", "Glob", "Bash"],
+        ["WebSearch", "WebFetch", "Read", "Grep", "Glob", "Bash"],
     ),
     (
         "ux-analyst",
@@ -131,7 +131,7 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
             "with a severity-rated report. Read-only."
         ),
         prompts.UX_ANALYST,
-        ["Read", "Grep", "Glob"],
+        ["WebSearch", "WebFetch", "Read", "Grep", "Glob"],
     ),
 ]
 

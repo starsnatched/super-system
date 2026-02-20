@@ -1,6 +1,6 @@
 # super-system
 
-Multi-agent software engineering team powered by Claude. Describe what you want built and a team of 12 specialist AI agents collaborates through a 10-phase development lifecycle -- including continuous autonomous improvement -- to produce exceptional, production-ready software.
+Multi-agent software engineering team powered by Claude. Describe what you want built and a team of 12 specialist AI agents collaborates through a dynamic, non-linear development workflow -- navigating freely between research, architecture, implementation, review, testing, security, and improvement activities -- to produce exceptional, production-ready software.
 
 ## Quick install
 
@@ -78,7 +78,7 @@ uv run python main.py "Build something"
 
 ## How it works
 
-An orchestrator agent acts as a demanding tech lead, driving 12 specialist subagents through a strict development lifecycle. The system does not stop after the first working version -- it keeps iterating autonomously, adding features, fixing issues, and polishing until the product is exceptional.
+An orchestrator agent acts as a demanding tech lead, driving 12 specialist subagents through a dynamic development workflow. Rather than following a rigid pipeline, the orchestrator navigates freely between activities -- jumping back to architecture when implementation reveals a design flaw, re-running tests after security fixes, or looping through research when encountering unfamiliar APIs. The system does not stop after the first working version -- it keeps iterating autonomously, adding features, fixing issues, and polishing until the product is exceptional.
 
 ### Inter-agent communication
 
@@ -105,22 +105,24 @@ The orchestrator still coordinates the overall lifecycle and routes unanswered q
 | `ux-analyst` | Reviews UI for accessibility, usability, responsive design | Read-only |
 | `doc-writer` | Produces README, API docs, setup guides | Full write |
 
-### Development lifecycle
+### Development activities
 
-| Phase | Agent(s) | What happens |
+The orchestrator has a set of development activities it can invoke in any order, revisit at any time, and interleave as needed. It decides what to do next based on the current state of the project.
+
+| Activity | Agent(s) | What happens |
 |---|---|---|
-| 1. Research | `researcher` | Gathers latest docs, libraries, best practices |
-| 2. Architecture | `architect` | Produces detailed technical spec |
-| 3. Implementation | `backend-coder`, `frontend-coder`, `infra-coder` | Writes all code following the spec |
-| 4. Code Review | `reviewer` | Reviews code, loops with coders until APPROVE |
-| 5. Testing | `tester` | Writes and runs tests, loops until 100% pass |
-| 6. Security Audit | `security-auditor` | Scans for vulnerabilities, loops until clean |
-| 7. Documentation | `doc-writer` | Produces README and API docs |
-| 8. Ship-Ready Gate | `architect` + `reviewer` | Holistic sign-off, loops back if issues found |
-| 9. Continuous Improvement | `product-manager`, `performance-optimizer`, `ux-analyst` | Evaluates product, generates backlog, implements improvements in cycles |
-| 10. Final Delivery | `doc-writer` + `tester` | Updates docs, runs final test suite, prints summary |
+| Research | `researcher` | Gathers latest docs, libraries, best practices |
+| Architecture | `architect` | Produces detailed technical spec and feature plan |
+| Implementation | `backend-coder`, `frontend-coder`, `infra-coder` | Writes code one feature at a time following the spec |
+| Code Review | `reviewer` | Reviews code per-feature and holistically, loops until APPROVE |
+| Testing | `tester` | Writes and runs tests, loops until 100% pass |
+| Security Audit | `security-auditor` | Scans for vulnerabilities, loops until clean |
+| Documentation | `doc-writer` | Produces README and API docs |
+| Ship-Ready Gate | `architect` + `reviewer` | Holistic sign-off, jumps back to any activity if issues found |
+| Improvement | `product-manager`, `performance-optimizer`, `ux-analyst` | Evaluates product, generates backlog, implements improvements in cycles |
+| Delivery | `doc-writer` + `tester` | Updates docs, runs final test suite, prints summary |
 
-Every phase has an inner retry loop. Phase 8 wraps the initial build in an outer loop. Phase 9 is an autonomous improvement loop that keeps iterating -- the product manager evaluates, the performance optimizer profiles, the UX analyst reviews, and then coders implement improvements -- until the product manager declares the product ship-ready or 5 improvement cycles complete.
+The typical first-pass order is Research -> Architecture -> Implementation -> Review -> Testing -> Security -> Documentation -> Ship-Ready Gate -> Improvement -> Delivery, but the orchestrator navigates non-linearly: a test failure sends it back to implementation, a code review finding might trigger re-architecture, a security issue during improvement loops back through implementation and testing. Each activity has retry limits to prevent infinite loops, and the orchestrator tracks its navigation to detect and break out of unproductive cycles.
 
 ## Project structure
 

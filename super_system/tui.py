@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 
 from rich.markdown import Markdown
@@ -19,7 +19,6 @@ from textual.reactive import reactive
 from textual.screen import ModalScreen, Screen
 from textual.widgets import (
     Button,
-    DataTable,
     Footer,
     Header,
     Input,
@@ -35,7 +34,7 @@ from super_system.orchestrator import (
     RunCallbacks,
     run,
 )
-from super_system.sessions import SessionRecord, list_sessions, save_session
+from super_system.config import load_api_key, save_api_key
 
 SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
@@ -45,91 +44,7 @@ class LaunchConfig:
     prompt: str
     cwd: Path | None = None
     verbose: bool = False
-    resume: str | None = None
-    fork: bool = False
-
-
-class SessionActionScreen(ModalScreen[str]):
-    BINDINGS = [
-        Binding("escape", "cancel", "Cancel"),
-    ]
-
-    CSS = """
-    SessionActionScreen {
-        align: center middle;
-    }
-
-    #action-box {
-        width: 52;
-        height: auto;
-        padding: 1 2;
-        background: $surface;
-        border: tall $primary;
-    }
-
-    #action-title {
-        width: 100%;
-        text-align: center;
-        margin: 0 0 1 0;
-    }
-
-    #action-detail {
-        width: 100%;
-        text-align: center;
-        color: $text-muted;
-    }
-
-    #action-meta {
-        width: 100%;
-        text-align: center;
-        color: $text-disabled;
-        margin: 0 0 1 0;
-    }
-
-    #action-buttons {
-        width: 100%;
-        height: auto;
-        align: center middle;
-    }
-
-    #action-buttons Button {
-        margin: 0 1;
-    }
-    """
-
-    def __init__(self, session: SessionRecord) -> None:
-        super().__init__()
-        self._session = session
-
-    def compose(self) -> ComposeResult:
-        s = self._session
-        status_map = {
-            "completed": "[bright_green]done[/]",
-            "running": "[bright_yellow]running[/]",
-            "failed": "[bright_red]failed[/]",
-            "interrupted": "[yellow]interrupted[/]",
-        }
-        status_txt = status_map.get(s.status, s.status)
-        with Vertical(id="action-box"):
-            yield Static(
-                f"[bold cyan]{s.session_id[:16]}[/]",
-                id="action-title",
-            )
-            yield Static(s.prompt_preview[:48], id="action-detail")
-            yield Static(
-                f"{status_txt}  [dim]${s.cost_usd:.4f}  {s.num_turns} turns[/]",
-                id="action-meta",
-            )
-            with Horizontal(id="action-buttons"):
-                yield Button("Resume", id="btn-resume", variant="primary")
-                yield Button("Fork", id="btn-fork", variant="warning")
-                yield Button("Cancel", id="btn-cancel", variant="default")
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        self.dismiss(event.button.id or "btn-cancel")
-
-    def action_cancel(self) -> None:
-        self.dismiss("btn-cancel")
+    api_key: str | None = None
 
 
 class HelpScreen(ModalScreen):
@@ -184,7 +99,7 @@ class HelpScreen(ModalScreen):
         tbl.add_column(style="dim")
         tbl.add_row("tab / shift+tab", "Switch panel focus")
         tbl.add_row("q", "Quit application")
-        tbl.add_row("n", "Start new session")
+        tbl.add_row("n", "Start new run")
         tbl.add_row("?", "Show this help")
         tbl.add_row("↑ / ↓", "Scroll focused panel")
         tbl.add_row("page up / down", "Scroll faster")
@@ -252,6 +167,51 @@ class WelcomeScreen(Screen[LaunchConfig]):
         border: tall $accent;
     }
 
+    #api-key-row {
+        width: 100%;
+        height: auto;
+        margin: 0 0 1 0;
+    }
+
+    #api-key-input {
+        width: 1fr;
+    }
+
+    #api-key-input:focus {
+        border: tall $accent;
+    }
+
+    #api-key-summary {
+        width: 100%;
+        height: auto;
+        margin: 0 0 1 0;
+    }
+
+    #api-key-summary-label {
+        width: 16;
+        padding: 0 1 0 0;
+        text-align: right;
+        color: $text-muted;
+    }
+
+    #api-key-summary-status {
+        width: auto;
+        padding: 0 1 0 0;
+    }
+
+    #btn-change-key {
+        min-width: 10;
+        height: 1;
+        margin: 0 0 0 1;
+        background: transparent;
+        border: none;
+        color: $accent;
+    }
+
+    #btn-change-key:hover {
+        text-style: underline;
+    }
+
     .switch-row {
         width: 100%;
         height: auto;
@@ -272,17 +232,6 @@ class WelcomeScreen(Screen[LaunchConfig]):
         border: tall $accent;
     }
 
-    #sessions-label {
-        color: $text-muted;
-        margin: 1 0 0 0;
-    }
-
-    #sessions-table {
-        height: auto;
-        max-height: 14;
-        margin: 0 0 1 0;
-    }
-
     #hint {
         width: 100%;
         text-align: center;
@@ -296,18 +245,16 @@ class WelcomeScreen(Screen[LaunchConfig]):
         *,
         default_cwd: Path | None = None,
         default_verbose: bool = False,
+        default_api_key: str | None = None,
     ) -> None:
         super().__init__()
         self._default_cwd = default_cwd or Path.cwd()
         self._default_verbose = default_verbose
-        self._selected_session: SessionRecord | None = None
-        try:
-            self._sessions_list = list_sessions()
-        except Exception:
-            self._sessions_list = []
-        self._sessions_map: dict[str, SessionRecord] = {
-            s.session_id: s for s in self._sessions_list
-        }
+        self._default_api_key = (
+            default_api_key
+            or os.environ.get("ANTHROPIC_API_KEY", "")
+            or load_api_key()
+        )
 
     def compose(self) -> ComposeResult:
         with Vertical(id="welcome-box"):
@@ -325,6 +272,21 @@ class WelcomeScreen(Screen[LaunchConfig]):
                         placeholder="/path/to/project",
                         id="cwd-input",
                     )
+                with Horizontal(id="api-key-summary"):
+                    yield Static("API Key", id="api-key-summary-label")
+                    yield Static(
+                        "[bright_green]✓ configured[/]",
+                        id="api-key-summary-status",
+                    )
+                    yield Button("Change", id="btn-change-key", variant="default")
+                with Horizontal(id="api-key-row"):
+                    yield Static("API Key", classes="field-label")
+                    yield Input(
+                        value=self._default_api_key,
+                        placeholder="sk-ant-…",
+                        id="api-key-input",
+                        password=True,
+                    )
                 with Horizontal(classes="switch-row"):
                     yield Static("Verbose", classes="switch-label")
                     yield Switch(id="verbose-switch", value=self._default_verbose)
@@ -334,106 +296,81 @@ class WelcomeScreen(Screen[LaunchConfig]):
                 id="prompt-input",
             )
 
-            if self._sessions_list:
-                yield Static("Recent sessions", id="sessions-label")
-                yield DataTable(id="sessions-table", cursor_type="row")
-
-            hints = ["[white]enter[/] [dim]start[/]"]
-            if self._sessions_list:
-                hints.append("[white]↑↓[/] [dim]select session[/]")
-            hints.append("[white]esc[/] [dim]quit[/]")
-            yield Static("   ".join(hints), id="hint")
+            yield Static(
+                "[white]enter[/] [dim]start[/]   [white]esc[/] [dim]quit[/]",
+                id="hint",
+            )
 
         yield Footer()
 
     def on_mount(self) -> None:
-        if not self._sessions_list:
-            return
-        table = self.query_one("#sessions-table", DataTable)
-        table.add_columns("Session", "Prompt", "Status", "Cost", "Started")
-        for s in reversed(self._sessions_list[-10:]):
-            status_styles = {
-                "completed": ("✓ done", "bright_green"),
-                "running": ("● run", "bright_yellow"),
-                "failed": ("✗ fail", "bright_red"),
-                "interrupted": ("⚠ stop", "yellow"),
-            }
-            st_text, st_color = status_styles.get(s.status, (s.status, "white"))
-            started = (
-                datetime.fromtimestamp(s.started_at, tz=timezone.utc)
-                .astimezone()
-                .strftime("%m/%d %H:%M")
-            )
-            table.add_row(
-                Text(s.session_id[:12], style="cyan"),
-                Text(s.prompt_preview[:36], style="white"),
-                Text(st_text, style=st_color),
-                Text(f"${s.cost_usd:.4f}", style="dim"),
-                Text(started, style="dim"),
-                key=s.session_id,
-            )
+        has_key = bool(self._default_api_key)
+        self.query_one("#api-key-summary").display = has_key
+        self.query_one("#api-key-row").display = not has_key
 
-    def _build_config(
-        self,
-        prompt: str,
-        resume: str | None = None,
-        fork: bool = False,
-    ) -> LaunchConfig:
+    def _build_config(self, prompt: str) -> LaunchConfig:
         cwd_raw = self.query_one("#cwd-input", Input).value.strip()
         cwd = Path(cwd_raw).resolve() if cwd_raw else None
         verbose = self.query_one("#verbose-switch", Switch).value
+        api_key = self.query_one("#api-key-input", Input).value.strip() or None
         return LaunchConfig(
             prompt=prompt,
             cwd=cwd,
             verbose=verbose,
-            resume=resume,
-            fork=fork,
+            api_key=api_key,
         )
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-change-key":
+            self.query_one("#api-key-summary").display = False
+            self.query_one("#api-key-row").display = True
+            self.query_one("#api-key-input", Input).value = ""
+            self.query_one("#api-key-input", Input).focus()
+
+    def _validate_config(self, config: LaunchConfig) -> bool:
+        if config.cwd and not config.cwd.is_dir():
+            self.notify(
+                f"Directory not found: {config.cwd}",
+                severity="error",
+                title="Invalid Path",
+            )
+            self.query_one("#cwd-input", Input).focus()
+            return False
+        if not config.api_key:
+            self.notify(
+                "An Anthropic API key is required.",
+                severity="error",
+                title="Missing API Key",
+            )
+            self.query_one("#api-key-summary").display = False
+            self.query_one("#api-key-row").display = True
+            self.query_one("#api-key-input", Input).focus()
+            return False
+        return True
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "cwd-input":
+            if self.query_one("#api-key-row").display:
+                self.query_one("#api-key-input", Input).focus()
+            else:
+                self.query_one("#prompt-input", Input).focus()
+            return
+        if event.input.id == "api-key-input":
+            key = event.value.strip()
+            if key:
+                save_api_key(key)
+                os.environ["ANTHROPIC_API_KEY"] = key
+                self._default_api_key = key
+                self.query_one("#api-key-row").display = False
+                self.query_one("#api-key-summary").display = True
+                self.notify("API key saved.", severity="information")
             self.query_one("#prompt-input", Input).focus()
             return
         prompt = event.value.strip()
         if not prompt:
             return
         config = self._build_config(prompt)
-        if config.cwd and not config.cwd.is_dir():
-            self.notify(
-                f"Directory not found: {config.cwd}",
-                severity="error",
-                title="Invalid Path",
-            )
-            self.query_one("#cwd-input", Input).focus()
-            return
-        self.dismiss(config)
-
-    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        session_id = str(event.row_key.value)
-        session = self._sessions_map.get(session_id)
-        if not session:
-            return
-        self._selected_session = session
-        self.app.push_screen(
-            SessionActionScreen(session),
-            self._on_session_action,
-        )
-
-    def _on_session_action(self, action: str) -> None:
-        session = self._selected_session
-        if not session or action == "btn-cancel":
-            return
-        prompt_input = self.query_one("#prompt-input", Input)
-        prompt = prompt_input.value.strip() or "Continue from where you left off."
-        fork = action == "btn-fork"
-        config = self._build_config(prompt, resume=session.session_id, fork=fork)
-        if config.cwd and not config.cwd.is_dir():
-            self.notify(
-                f"Directory not found: {config.cwd}",
-                severity="error",
-                title="Invalid Path",
-            )
-            self.query_one("#cwd-input", Input).focus()
+        if not self._validate_config(config):
             return
         self.dismiss(config)
 
@@ -443,10 +380,7 @@ class WelcomeScreen(Screen[LaunchConfig]):
 
 class InfoBar(Static):
     prompt_text: reactive[str] = reactive("")
-    session_id: reactive[str] = reactive("")
     working_dir: reactive[str] = reactive("")
-    resumed: reactive[bool] = reactive(False)
-    forked: reactive[bool] = reactive(False)
 
     def render(self) -> Text:
         line = Text()
@@ -455,13 +389,6 @@ class InfoBar(Static):
         if len(display) > 60:
             display = display[:60] + "…"
         line.append(display, style="white")
-        if self.session_id:
-            line.append("  │  ", style="dim")
-            line.append(self.session_id[:12], style="cyan")
-            if self.forked:
-                line.append(" forked", style="dim yellow")
-            elif self.resumed:
-                line.append(" resumed", style="dim green")
         if self.working_dir:
             line.append("  │  ", style="dim")
             wd = self.working_dir
@@ -550,7 +477,7 @@ class SuperSystemApp(App):
     BINDINGS = [
         Binding("q", "quit", "Quit", priority=True),
         Binding("question_mark", "show_help", "Help"),
-        Binding("n", "new_session", "New Session"),
+        Binding("n", "new_run", "New Run"),
     ]
 
     def __init__(
@@ -559,16 +486,12 @@ class SuperSystemApp(App):
         *,
         cwd: Path | None = None,
         verbose: bool = False,
-        resume: str | None = None,
-        fork_session: bool = False,
     ) -> None:
         super().__init__()
         self._prompt = prompt
         self._cwd = cwd
         self._verbose = verbose
-        self._resume = resume
-        self._fork_session = fork_session
-        self._session_id: str | None = None
+        self._api_key: str | None = None
         self._start_mono = time.monotonic()
         self._start_wall = time.time()
         self._run_active = False
@@ -606,6 +529,7 @@ class SuperSystemApp(App):
                 WelcomeScreen(
                     default_cwd=self._cwd,
                     default_verbose=self._verbose,
+                    default_api_key=self._api_key,
                 ),
                 self._on_welcome,
             )
@@ -614,26 +538,22 @@ class SuperSystemApp(App):
         self._prompt = config.prompt
         self._cwd = config.cwd
         self._verbose = config.verbose
-        if config.resume:
-            self._resume = config.resume
-        self._fork_session = config.fork
+        self._api_key = config.api_key
         self._begin_run()
 
     def _begin_run(self) -> None:
+        if self._api_key:
+            os.environ["ANTHROPIC_API_KEY"] = self._api_key
         self._run_active = True
         info_bar = self.query_one("#info-bar", InfoBar)
         info_bar.prompt_text = self._prompt or ""
         info_bar.working_dir = str(self._cwd) if self._cwd else str(Path.cwd())
-        if self._resume:
-            info_bar.resumed = True
-            if self._fork_session:
-                info_bar.forked = True
 
         status_bar = self.query_one("#status-bar", StatusBar)
         status_bar.status = "running"
 
         output = self.query_one("#output-log", RichLog)
-        output.write(Text("  Starting session…", style="dim italic"))
+        output.write(Text("  Starting…", style="dim italic"))
 
         self._start_mono = time.monotonic()
         self._start_wall = time.time()
@@ -657,40 +577,13 @@ class SuperSystemApp(App):
         mins, secs = divmod(int(elapsed), 60)
         return f"{mins:02d}:{secs:02d}"
 
-    def _save(
-        self,
-        status: str,
-        cost: float = 0.0,
-        turns: int = 0,
-        duration: int = 0,
-    ) -> None:
-        if not self._session_id:
-            return
-        save_session(
-            SessionRecord(
-                session_id=self._session_id,
-                prompt_preview=(self._prompt or "")[:100],
-                started_at=self._start_wall,
-                status=status,
-                cost_usd=cost,
-                num_turns=turns,
-                duration_ms=duration,
-            )
-        )
-
     def _reset_ui(self) -> None:
         self._prompt = None
-        self._resume = None
-        self._fork_session = False
-        self._session_id = None
         self._stop_tick()
 
         info_bar = self.query_one("#info-bar", InfoBar)
         info_bar.prompt_text = ""
-        info_bar.session_id = ""
         info_bar.working_dir = ""
-        info_bar.resumed = False
-        info_bar.forked = False
 
         status_bar = self.query_one("#status-bar", StatusBar)
         status_bar.turns = 0
@@ -705,15 +598,16 @@ class SuperSystemApp(App):
     def action_show_help(self) -> None:
         self.push_screen(HelpScreen())
 
-    def action_new_session(self) -> None:
+    def action_new_run(self) -> None:
         if self._run_active:
-            self.notify("Session still running.", severity="warning")
+            self.notify("Run still active.", severity="warning")
             return
         self._reset_ui()
         self.push_screen(
             WelcomeScreen(
                 default_cwd=self._cwd,
                 default_verbose=self._verbose,
+                default_api_key=self._api_key,
             ),
             self._on_welcome,
         )
@@ -726,7 +620,6 @@ class SuperSystemApp(App):
 
         output = self.query_one("#output-log", RichLog)
         activity = self.query_one("#activity-log", RichLog)
-        info_bar = self.query_one("#info-bar", InfoBar)
         status_bar = self.query_one("#status-bar", StatusBar)
 
         def on_text(text: str) -> None:
@@ -764,10 +657,10 @@ class SuperSystemApp(App):
             result_table.add_row("Duration", f"{duration_ms / 1000:.1f}s")
 
             if is_error:
-                title = "[red]✗ Session failed[/red]"
+                title = "[red]✗ Run failed[/red]"
                 border = "red"
             else:
-                title = "[green]✓ Session complete[/green]"
+                title = "[green]✓ Run complete[/green]"
                 border = "green"
             output.write(
                 Panel(
@@ -781,13 +674,6 @@ class SuperSystemApp(App):
             if is_error and error_text:
                 output.write(Text(f"  {error_text}", style="bold red"))
 
-            self._save(
-                "failed" if is_error else "completed",
-                cost=cost_usd,
-                turns=num_turns,
-                duration=duration_ms,
-            )
-
         def on_system(subtype: str, data: object) -> None:
             line = Text()
             line.append(f"{self._ts()} ", style="dim green")
@@ -795,33 +681,15 @@ class SuperSystemApp(App):
             line.append(str(data)[:200], style="dim")
             activity.write(line)
 
-        def on_session_id(session_id: str) -> None:
-            self._session_id = session_id
-            info_bar.session_id = session_id
-
-            line = Text()
-            line.append(f"{self._ts()} ", style="dim green")
-            line.append("● ", style="bold bright_green")
-            if self._resume and not self._fork_session:
-                line.append(f"Resumed {session_id[:16]}", style="bright_green")
-            elif self._fork_session:
-                line.append(f"Forked {session_id[:16]}", style="bright_yellow")
-            else:
-                line.append(f"Started {session_id[:16]}", style="bright_green")
-            activity.write(line)
-            self._save("running")
-
         def on_interrupted() -> None:
             status_bar.status = "interrupted"
             activity.write(
                 Text(f"{self._ts()}  ⚠ Interrupted", style="bold yellow")
             )
-            self._save("interrupted")
 
         def on_error(msg: str) -> None:
             output.write(Text(f"\n✗ {msg}", style="bold red"))
             status_bar.status = "failed"
-            self._save("failed")
 
         callbacks = RunCallbacks(
             on_banner=lambda: None,
@@ -829,7 +697,6 @@ class SuperSystemApp(App):
             on_agent_dispatch=on_agent_dispatch,
             on_result=on_result,
             on_system=on_system,
-            on_session_id=on_session_id,
             on_interrupted=on_interrupted,
             on_error=on_error,
         )
@@ -839,8 +706,6 @@ class SuperSystemApp(App):
                 prompt,
                 cwd=self._cwd,
                 verbose=self._verbose,
-                resume=self._resume,
-                fork_session=self._fork_session,
                 callbacks=callbacks,
                 handle_signals=False,
             )

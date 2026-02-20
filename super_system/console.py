@@ -131,10 +131,10 @@ def print_result(
     table.add_row("Duration", f"{duration_s:.1f}s")
 
     if is_error:
-        title = "[error]✗ Session failed[/error]"
+        title = "[error]✗ Run failed[/error]"
         border_style = "red"
     else:
-        title = "[success]✓ Session complete[/success]"
+        title = "[success]✓ Run complete[/success]"
         border_style = "green"
 
     console.print(Panel(table, title=title, border_style=border_style, expand=False))

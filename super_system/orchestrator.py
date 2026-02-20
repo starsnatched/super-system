@@ -37,7 +37,6 @@ class RunCallbacks:
     on_agent_dispatch: Callable[..., Any] = field(default=lambda a, d="": None)
     on_result: Callable[..., Any] = field(default=lambda *a, **kw: None)
     on_system: Callable[..., Any] = field(default=lambda s, d: None)
-    on_session_id: Callable[..., Any] = field(default=lambda s: None)
     on_interrupted: Callable[..., Any] = field(default=lambda: None)
     on_error: Callable[..., Any] = field(default=lambda m: None)
 
@@ -78,8 +77,6 @@ async def run(
     *,
     cwd: Path | None = None,
     verbose: bool = False,
-    resume: str | None = None,
-    fork_session: bool = False,
     callbacks: RunCallbacks | None = None,
     handle_signals: bool = True,
 ) -> None:
@@ -116,10 +113,6 @@ async def run(
         extra_args={"chrome": None},
     )
 
-    if resume is not None:
-        options.resume = resume
-    if fork_session:
-        options.fork_session = True
     if cwd is not None:
         options.cwd = cwd
     if verbose:
@@ -145,12 +138,6 @@ async def run(
                     str(message.result) if message.is_error else "",
                 )
             elif isinstance(message, SystemMessage):
-                if hasattr(message, "subtype") and message.subtype == "init":
-                    sid = None
-                    if isinstance(message.data, dict):
-                        sid = message.data.get("session_id")
-                    if sid:
-                        cb.on_session_id(sid)
                 if verbose:
                     cb.on_system(message.subtype, message.data)
     except asyncio.CancelledError:

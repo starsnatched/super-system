@@ -16,8 +16,17 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
-from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Header, Input, RichLog, Static
+from textual.screen import ModalScreen, Screen
+from textual.widgets import (
+    Button,
+    DataTable,
+    Footer,
+    Header,
+    Input,
+    RichLog,
+    Static,
+    Switch,
+)
 
 from super_system.console import AGENT_ICONS, AGENT_STYLES
 from super_system.orchestrator import (
@@ -34,11 +43,156 @@ SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇",
 @dataclass
 class LaunchConfig:
     prompt: str
+    cwd: Path | None = None
+    verbose: bool = False
     resume: str | None = None
     fork: bool = False
 
 
-class WelcomeScreen(Screen):
+class SessionActionScreen(ModalScreen[str]):
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel"),
+    ]
+
+    CSS = """
+    SessionActionScreen {
+        align: center middle;
+    }
+
+    #action-box {
+        width: 52;
+        height: auto;
+        padding: 1 2;
+        background: $surface;
+        border: tall $primary;
+    }
+
+    #action-title {
+        width: 100%;
+        text-align: center;
+        margin: 0 0 1 0;
+    }
+
+    #action-detail {
+        width: 100%;
+        text-align: center;
+        color: $text-muted;
+    }
+
+    #action-meta {
+        width: 100%;
+        text-align: center;
+        color: $text-disabled;
+        margin: 0 0 1 0;
+    }
+
+    #action-buttons {
+        width: 100%;
+        height: auto;
+        align: center middle;
+    }
+
+    #action-buttons Button {
+        margin: 0 1;
+    }
+    """
+
+    def __init__(self, session: SessionRecord) -> None:
+        super().__init__()
+        self._session = session
+
+    def compose(self) -> ComposeResult:
+        s = self._session
+        status_map = {
+            "completed": "[bright_green]done[/]",
+            "running": "[bright_yellow]running[/]",
+            "failed": "[bright_red]failed[/]",
+            "interrupted": "[yellow]interrupted[/]",
+        }
+        status_txt = status_map.get(s.status, s.status)
+        with Vertical(id="action-box"):
+            yield Static(
+                f"[bold cyan]{s.session_id[:16]}[/]",
+                id="action-title",
+            )
+            yield Static(s.prompt_preview[:48], id="action-detail")
+            yield Static(
+                f"{status_txt}  [dim]${s.cost_usd:.4f}  {s.num_turns} turns[/]",
+                id="action-meta",
+            )
+            with Horizontal(id="action-buttons"):
+                yield Button("Resume", id="btn-resume", variant="primary")
+                yield Button("Fork", id="btn-fork", variant="warning")
+                yield Button("Cancel", id="btn-cancel", variant="default")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss(event.button.id or "btn-cancel")
+
+    def action_cancel(self) -> None:
+        self.dismiss("btn-cancel")
+
+
+class HelpScreen(ModalScreen):
+    BINDINGS = [
+        Binding("escape", "dismiss", "Close"),
+    ]
+
+    CSS = """
+    HelpScreen {
+        align: center middle;
+    }
+
+    #help-box {
+        width: 56;
+        height: auto;
+        padding: 1 2;
+        background: $surface;
+        border: tall $accent;
+    }
+
+    #help-title {
+        width: 100%;
+        text-align: center;
+        margin: 0 0 1 0;
+    }
+
+    #help-content {
+        width: 100%;
+        height: auto;
+    }
+
+    #help-hint {
+        width: 100%;
+        text-align: center;
+        color: $text-muted;
+        margin: 1 0 0 0;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="help-box"):
+            yield Static("[bold]Keyboard Shortcuts[/bold]", id="help-title")
+            yield Static(id="help-content")
+            yield Static(
+                "[dim]Press [white]esc[/white] to close[/dim]",
+                id="help-hint",
+            )
+
+    def on_mount(self) -> None:
+        tbl = Table(show_header=False, box=None, padding=(0, 2), expand=True)
+        tbl.add_column(style="bold white", width=16)
+        tbl.add_column(style="dim")
+        tbl.add_row("tab / shift+tab", "Switch panel focus")
+        tbl.add_row("q", "Quit application")
+        tbl.add_row("n", "Start new session")
+        tbl.add_row("?", "Show this help")
+        tbl.add_row("↑ / ↓", "Scroll focused panel")
+        tbl.add_row("page up / down", "Scroll faster")
+        tbl.add_row("home / end", "Jump to top / bottom")
+        self.query_one("#help-content", Static).update(tbl)
+
+
+class WelcomeScreen(Screen[LaunchConfig]):
     AUTO_FOCUS = "#prompt-input"
 
     BINDINGS = [
@@ -51,11 +205,11 @@ class WelcomeScreen(Screen):
     }
 
     #welcome-box {
-        width: 72;
+        width: 80;
         height: auto;
         padding: 1 3;
         background: $surface;
-        border: round $primary-darken-1;
+        border: tall $primary-darken-1;
     }
 
     #logo {
@@ -68,10 +222,50 @@ class WelcomeScreen(Screen):
         width: 100%;
         text-align: center;
         color: $text-muted;
+        margin: 0 0 1 0;
+    }
+
+    #config-section {
+        width: 100%;
+        height: auto;
+        margin: 0 0 1 0;
+    }
+
+    .field-row {
+        width: 100%;
+        height: auto;
+        margin: 0 0 1 0;
+    }
+
+    .field-label {
+        width: 16;
+        padding: 1 1 0 0;
+        text-align: right;
+        color: $text-muted;
+    }
+
+    #cwd-input {
+        width: 1fr;
+    }
+
+    #cwd-input:focus {
+        border: tall $accent;
+    }
+
+    .switch-row {
+        width: 100%;
+        height: auto;
+    }
+
+    .switch-label {
+        width: 16;
+        padding: 0 1 0 0;
+        text-align: right;
+        color: $text-muted;
     }
 
     #prompt-input {
-        margin: 1 0 0 0;
+        margin: 0 0 1 0;
     }
 
     #prompt-input:focus {
@@ -79,14 +273,14 @@ class WelcomeScreen(Screen):
     }
 
     #sessions-label {
-        margin: 1 0 0 0;
         color: $text-muted;
+        margin: 1 0 0 0;
     }
 
     #sessions-table {
         height: auto;
-        max-height: 12;
-        margin: 1 0 0 0;
+        max-height: 14;
+        margin: 0 0 1 0;
     }
 
     #hint {
@@ -97,8 +291,16 @@ class WelcomeScreen(Screen):
     }
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        default_cwd: Path | None = None,
+        default_verbose: bool = False,
+    ) -> None:
         super().__init__()
+        self._default_cwd = default_cwd or Path.cwd()
+        self._default_verbose = default_verbose
+        self._selected_session: SessionRecord | None = None
         try:
             self._sessions_list = list_sessions()
         except Exception:
@@ -114,18 +316,34 @@ class WelcomeScreen(Screen):
                 id="logo",
             )
             yield Static("multi-agent engineering team", id="tagline")
+
+            with Vertical(id="config-section"):
+                with Horizontal(classes="field-row"):
+                    yield Static("Working Dir", classes="field-label")
+                    yield Input(
+                        value=str(self._default_cwd),
+                        placeholder="/path/to/project",
+                        id="cwd-input",
+                    )
+                with Horizontal(classes="switch-row"):
+                    yield Static("Verbose", classes="switch-label")
+                    yield Switch(id="verbose-switch", value=self._default_verbose)
+
             yield Input(
                 placeholder="What would you like to build?",
                 id="prompt-input",
             )
+
             if self._sessions_list:
                 yield Static("Recent sessions", id="sessions-label")
                 yield DataTable(id="sessions-table", cursor_type="row")
-            hint_parts = ["[white]enter[/] [dim]start[/]"]
+
+            hints = ["[white]enter[/] [dim]start[/]"]
             if self._sessions_list:
-                hint_parts.append("[white]↑↓[/] [dim]select session[/]")
-            hint_parts.append("[white]esc[/] [dim]quit[/]")
-            yield Static("   ".join(hint_parts), id="hint")
+                hints.append("[white]↑↓[/] [dim]select session[/]")
+            hints.append("[white]esc[/] [dim]quit[/]")
+            yield Static("   ".join(hints), id="hint")
+
         yield Footer()
 
     def on_mount(self) -> None:
@@ -155,19 +373,69 @@ class WelcomeScreen(Screen):
                 key=s.session_id,
             )
 
+    def _build_config(
+        self,
+        prompt: str,
+        resume: str | None = None,
+        fork: bool = False,
+    ) -> LaunchConfig:
+        cwd_raw = self.query_one("#cwd-input", Input).value.strip()
+        cwd = Path(cwd_raw).resolve() if cwd_raw else None
+        verbose = self.query_one("#verbose-switch", Switch).value
+        return LaunchConfig(
+            prompt=prompt,
+            cwd=cwd,
+            verbose=verbose,
+            resume=resume,
+            fork=fork,
+        )
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        value = event.value.strip()
-        if value:
-            self.dismiss(LaunchConfig(prompt=value))
+        if event.input.id == "cwd-input":
+            self.query_one("#prompt-input", Input).focus()
+            return
+        prompt = event.value.strip()
+        if not prompt:
+            return
+        config = self._build_config(prompt)
+        if config.cwd and not config.cwd.is_dir():
+            self.notify(
+                f"Directory not found: {config.cwd}",
+                severity="error",
+                title="Invalid Path",
+            )
+            self.query_one("#cwd-input", Input).focus()
+            return
+        self.dismiss(config)
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         session_id = str(event.row_key.value)
         session = self._sessions_map.get(session_id)
         if not session:
             return
-        input_widget = self.query_one("#prompt-input", Input)
-        prompt = input_widget.value.strip() or "Continue from where you left off."
-        self.dismiss(LaunchConfig(prompt=prompt, resume=session.session_id))
+        self._selected_session = session
+        self.app.push_screen(
+            SessionActionScreen(session),
+            self._on_session_action,
+        )
+
+    def _on_session_action(self, action: str) -> None:
+        session = self._selected_session
+        if not session or action == "btn-cancel":
+            return
+        prompt_input = self.query_one("#prompt-input", Input)
+        prompt = prompt_input.value.strip() or "Continue from where you left off."
+        fork = action == "btn-fork"
+        config = self._build_config(prompt, resume=session.session_id, fork=fork)
+        if config.cwd and not config.cwd.is_dir():
+            self.notify(
+                f"Directory not found: {config.cwd}",
+                severity="error",
+                title="Invalid Path",
+            )
+            self.query_one("#cwd-input", Input).focus()
+            return
+        self.dismiss(config)
 
     def action_quit_app(self) -> None:
         self.app.exit()
@@ -176,15 +444,16 @@ class WelcomeScreen(Screen):
 class InfoBar(Static):
     prompt_text: reactive[str] = reactive("")
     session_id: reactive[str] = reactive("")
+    working_dir: reactive[str] = reactive("")
     resumed: reactive[bool] = reactive(False)
     forked: reactive[bool] = reactive(False)
 
     def render(self) -> Text:
         line = Text()
-        line.append("  ▸ ", style="bold bright_cyan")
+        line.append("  ⚡ ", style="bold bright_cyan")
         display = self.prompt_text
-        if len(display) > 100:
-            display = display[:100] + "…"
+        if len(display) > 60:
+            display = display[:60] + "…"
         line.append(display, style="white")
         if self.session_id:
             line.append("  │  ", style="dim")
@@ -193,6 +462,12 @@ class InfoBar(Static):
                 line.append(" forked", style="dim yellow")
             elif self.resumed:
                 line.append(" resumed", style="dim green")
+        if self.working_dir:
+            line.append("  │  ", style="dim")
+            wd = self.working_dir
+            if len(wd) > 30:
+                wd = "…" + wd[-29:]
+            line.append(wd, style="dim italic")
         return line
 
 
@@ -274,6 +549,8 @@ class SuperSystemApp(App):
 
     BINDINGS = [
         Binding("q", "quit", "Quit", priority=True),
+        Binding("question_mark", "show_help", "Help"),
+        Binding("n", "new_session", "New Session"),
     ]
 
     def __init__(
@@ -294,6 +571,8 @@ class SuperSystemApp(App):
         self._session_id: str | None = None
         self._start_mono = time.monotonic()
         self._start_wall = time.time()
+        self._run_active = False
+        self._tick_timer: object | None = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -323,18 +602,28 @@ class SuperSystemApp(App):
         if self._prompt:
             self._begin_run()
         else:
-            self.push_screen(WelcomeScreen(), self._on_welcome)
+            self.push_screen(
+                WelcomeScreen(
+                    default_cwd=self._cwd,
+                    default_verbose=self._verbose,
+                ),
+                self._on_welcome,
+            )
 
     def _on_welcome(self, config: LaunchConfig) -> None:
         self._prompt = config.prompt
+        self._cwd = config.cwd
+        self._verbose = config.verbose
         if config.resume:
             self._resume = config.resume
         self._fork_session = config.fork
         self._begin_run()
 
     def _begin_run(self) -> None:
+        self._run_active = True
         info_bar = self.query_one("#info-bar", InfoBar)
         info_bar.prompt_text = self._prompt or ""
+        info_bar.working_dir = str(self._cwd) if self._cwd else str(Path.cwd())
         if self._resume:
             info_bar.resumed = True
             if self._fork_session:
@@ -348,8 +637,14 @@ class SuperSystemApp(App):
 
         self._start_mono = time.monotonic()
         self._start_wall = time.time()
-        self.set_interval(0.1, self._tick)
+        self._stop_tick()
+        self._tick_timer = self.set_interval(0.1, self._tick)
         self._run_orchestrator()
+
+    def _stop_tick(self) -> None:
+        if self._tick_timer is not None:
+            self._tick_timer.stop()  # type: ignore[union-attr]
+            self._tick_timer = None
 
     def _tick(self) -> None:
         bar = self.query_one("#status-bar", StatusBar)
@@ -381,6 +676,46 @@ class SuperSystemApp(App):
                 num_turns=turns,
                 duration_ms=duration,
             )
+        )
+
+    def _reset_ui(self) -> None:
+        self._prompt = None
+        self._resume = None
+        self._fork_session = False
+        self._session_id = None
+        self._stop_tick()
+
+        info_bar = self.query_one("#info-bar", InfoBar)
+        info_bar.prompt_text = ""
+        info_bar.session_id = ""
+        info_bar.working_dir = ""
+        info_bar.resumed = False
+        info_bar.forked = False
+
+        status_bar = self.query_one("#status-bar", StatusBar)
+        status_bar.turns = 0
+        status_bar.cost_usd = 0.0
+        status_bar.duration_s = 0.0
+        status_bar.status = "idle"
+        status_bar.spinner_frame = 0
+
+        self.query_one("#output-log", RichLog).clear()
+        self.query_one("#activity-log", RichLog).clear()
+
+    def action_show_help(self) -> None:
+        self.push_screen(HelpScreen())
+
+    def action_new_session(self) -> None:
+        if self._run_active:
+            self.notify("Session still running.", severity="warning")
+            return
+        self._reset_ui()
+        self.push_screen(
+            WelcomeScreen(
+                default_cwd=self._cwd,
+                default_verbose=self._verbose,
+            ),
+            self._on_welcome,
         )
 
     @work(thread=False)
@@ -520,3 +855,6 @@ class SuperSystemApp(App):
             output.write(
                 Text(f"\n✗ Unexpected error: {exc}", style="bold red")
             )
+        finally:
+            self._run_active = False
+            self._stop_tick()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import signal
 import sys
 from collections.abc import AsyncIterator, Callable
@@ -20,6 +21,8 @@ from claude_agent_sdk import (
 
 from super_system import prompts
 from super_system.agents import build_agents
+
+logger = logging.getLogger("super_system.orchestrator")
 
 
 class OrchestratorError(Exception):
@@ -121,26 +124,31 @@ async def run(
 
     try:
         async for message in query(prompt=_as_stream(prompt), options=options):
-            if isinstance(message, AssistantMessage):
-                for block in message.content:
-                    if isinstance(block, TextBlock):
-                        cb.on_text(block.text)
-                    elif isinstance(block, ToolUseBlock):
-                        desc = ""
-                        if isinstance(block.input, dict):
-                            desc = block.input.get("description", "")
-                        cb.on_agent_dispatch(block.name, desc)
-            elif isinstance(message, ResultMessage):
-                cb.on_result(
-                    message.num_turns,
-                    message.total_cost_usd or 0,
-                    message.duration_ms,
-                    message.is_error,
-                    str(message.result) if message.is_error else "",
-                )
-            elif isinstance(message, SystemMessage):
-                if verbose:
-                    cb.on_system(message.subtype, message.data)
+            try:
+                if isinstance(message, AssistantMessage):
+                    for block in message.content:
+                        if isinstance(block, TextBlock):
+                            cb.on_text(block.text)
+                        elif isinstance(block, ToolUseBlock):
+                            desc = ""
+                            if isinstance(block.input, dict):
+                                desc = block.input.get("description", "")
+                            cb.on_agent_dispatch(block.name, desc)
+                elif isinstance(message, ResultMessage):
+                    cb.on_result(
+                        message.num_turns,
+                        message.total_cost_usd or 0,
+                        message.duration_ms,
+                        message.is_error,
+                        str(message.result) if message.is_error else "",
+                    )
+                elif isinstance(message, SystemMessage):
+                    if verbose:
+                        cb.on_system(message.subtype, message.data)
+            except (asyncio.CancelledError, KeyboardInterrupt):
+                raise
+            except Exception as exc:
+                logger.warning("Error processing message: %s", exc, exc_info=True)
     except asyncio.CancelledError:
         cb.on_interrupted()
         raise OrchestratorInterrupted() from None
@@ -155,10 +163,10 @@ async def run(
             cb.on_interrupted()
             raise OrchestratorInterrupted() from None
         for exc in real.exceptions:
+            logger.warning("Agent error (ignored): %s: %s", type(exc).__name__, exc, exc_info=True)
             cb.on_error(f"{type(exc).__name__}: {exc}")
-        raise OrchestratorError(str(real)) from real
     except (OrchestratorInterrupted, OrchestratorError):
         raise
     except Exception as exc:
+        logger.warning("Orchestrator error (ignored): %s", exc, exc_info=True)
         cb.on_error(str(exc) or type(exc).__name__)
-        raise OrchestratorError(str(exc)) from exc

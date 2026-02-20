@@ -110,6 +110,7 @@ async def run(
         allowed_tools=["Task", "Read", "Grep", "Glob"],
         agents=agents,
         permission_mode="bypassPermissions",
+        model="opus",
         extra_args={"chrome": None},
     )
 

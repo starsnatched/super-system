@@ -170,6 +170,7 @@ def build_agents() -> dict[str, AgentDefinition]:
             description=description,
             prompt=full_prompt,
             tools=base_tools,
+            model="opus",
             memory="project",
         )
     return agents

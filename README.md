@@ -2,43 +2,60 @@
 
 Multi-agent software engineering team powered by Claude. Describe what you want built and a team of 12 specialist AI agents collaborates through a 10-phase development lifecycle -- including continuous autonomous improvement -- to produce exceptional, production-ready software.
 
-## Prerequisites
+## Quick install
 
-- Python 3.13+
-- [uv](https://docs.astral.sh/uv/)
-- A valid Anthropic API key (set `ANTHROPIC_API_KEY` in your environment)
-
-## Install
+One command — installs `uv` if needed, clones the repo, and puts `super-system` on your PATH:
 
 ```bash
-git clone <repo-url> && cd super-system
-uv sync
+curl -fsSL https://raw.githubusercontent.com/starsnatched/super-system/main/install.sh | bash
+```
+
+Your API key will be prompted on first launch and saved to `~/.config/super-system/config.json`.
+
+### Prerequisites
+
+- macOS or Linux
+- git
+- Python 3.13+ (managed automatically by uv)
+- A valid Anthropic API key
+
+### Manual install
+
+```bash
+git clone https://github.com/starsnatched/super-system.git
+uv tool install --editable ./super-system
 ```
 
 ## Usage
 
-Pass your project description as an argument:
+Launch the interactive TUI from any directory:
 
 ```bash
-uv run super-system "Build a REST API for a todo app with SQLite persistence"
+super-system
+```
+
+Pass a project description directly:
+
+```bash
+super-system "Build a REST API for a todo app with SQLite persistence"
 ```
 
 Build into a specific directory:
 
 ```bash
-uv run super-system -C /path/to/project "Build a CLI tool that converts CSV to JSON"
+super-system -C /path/to/project "Build a CLI tool that converts CSV to JSON"
 ```
 
 Pipe a prompt from a file:
 
 ```bash
-cat spec.txt | uv run super-system
+cat spec.txt | super-system
 ```
 
 Enable verbose logging to see agent dispatch details:
 
 ```bash
-uv run super-system -v "Build a markdown blog generator"
+super-system -v "Build a markdown blog generator"
 ```
 
 ### Options
@@ -52,9 +69,11 @@ uv run super-system -v "Build a markdown blog generator"
 
 ### Alternative entry points
 
+If running from the repo directory without a global install:
+
 ```bash
+uv run super-system "Build something"
 uv run python main.py "Build something"
-uv run python -m super_system "Build something"
 ```
 
 ## How it works

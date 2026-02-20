@@ -46,9 +46,10 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
     (
         "frontend-coder",
         (
-            "Frontend implementation specialist using Next.js (App Router) and "
-            "TypeScript. Use to write UI components, pages, styles, and "
-            "client-side logic. Has full write access, can run commands, "
+            "Frontend implementation specialist. Defaults to Next.js (App Router) "
+            "and TypeScript for new projects; adapts to the existing stack for "
+            "existing codebases. Use to write UI components, pages, styles, "
+            "and client-side logic. Has full write access, can run commands, "
             "and has browser access to visually verify rendered UI."
         ),
         prompts.FRONTEND_CODER,

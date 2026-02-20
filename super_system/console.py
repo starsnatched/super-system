@@ -25,6 +25,21 @@ AGENT_STYLES: dict[str, str] = {
     "ux-analyst": "plum2",
 }
 
+AGENT_ICONS: dict[str, str] = {
+    "researcher": "◇",
+    "architect": "△",
+    "backend-coder": "◆",
+    "frontend-coder": "●",
+    "infra-coder": "■",
+    "reviewer": "◎",
+    "tester": "▲",
+    "security-auditor": "◉",
+    "doc-writer": "□",
+    "product-manager": "▶",
+    "performance-optimizer": "⚡",
+    "ux-analyst": "○",
+}
+
 _SYSTEM_SUBTYPE_STYLES: dict[str, tuple[str, str]] = {
     "tool_use": ("🔧", "cyan"),
     "tool_result": ("📦", "green"),
@@ -80,9 +95,10 @@ def print_banner() -> None:
 
 def print_agent_dispatch(agent_name: str, description: str = "") -> None:
     color = AGENT_STYLES.get(agent_name, "white")
+    icon = AGENT_ICONS.get(agent_name, "▸")
     label = Text.assemble(
         (f"  {_ts()} ", "ts"),
-        ("▸ ", f"bold {color}"),
+        (f"{icon} ", f"bold {color}"),
         (agent_name, f"bold {color}"),
     )
     if description:

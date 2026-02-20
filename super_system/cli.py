@@ -118,8 +118,6 @@ def main() -> None:
     prompt: str | None = args.prompt
     if prompt is None and not sys.stdin.isatty():
         prompt = sys.stdin.read().strip()
-    if not prompt:
-        parser.error("No prompt provided. Pass as argument or pipe via stdin.")
 
     cwd: Path | None = args.cwd
     if cwd is not None:
@@ -128,9 +126,13 @@ def main() -> None:
             parser.error(f"Working directory does not exist: {cwd}")
 
     if args.no_tui:
+        if not prompt:
+            parser.error("No prompt provided. Pass as argument or pipe via stdin.")
         _run_console(prompt, cwd=cwd, verbose=args.verbose, resume=args.resume, fork=args.fork)
     else:
-        _run_tui(prompt, cwd=cwd, verbose=args.verbose, resume=args.resume, fork=args.fork)
+        if not prompt and args.resume:
+            prompt = "Continue from where you left off."
+        _run_tui(prompt or None, cwd=cwd, verbose=args.verbose, resume=args.resume, fork=args.fork)
 
 
 def _run_console(
@@ -190,7 +192,7 @@ def _run_console(
 
 
 def _run_tui(
-    prompt: str,
+    prompt: str | None,
     *,
     cwd: Path | None,
     verbose: bool,

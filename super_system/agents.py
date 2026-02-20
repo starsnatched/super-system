@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from claude_agent_sdk import AgentDefinition
 
 from super_system import prompts
-from super_system.message_board import COMMS_TOOLS
 
 BROWSER_TOOLS = ["mcp__claude-in-chrome"]
 
@@ -18,11 +17,10 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
         "researcher",
         (
             "Technical researcher. Use to gather latest documentation, "
-            "library info, best practices, and API references from the web. "
-            "Read-only -- cannot modify files."
+            "library info, best practices, and API references from the web."
         ),
         prompts.RESEARCHER,
-        ["WebSearch", "WebFetch", "Read", "Grep", "Glob"],
+        ["WebSearch", "WebFetch", "Read", "Write", "Edit", "Grep", "Glob"],
     ),
     (
         "architect",
@@ -30,10 +28,10 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
             "Software architect. Use to design system architecture, produce "
             "technical specs, define file structures, data models, and API "
             "contracts. Also used for final sign-off during the ship-ready "
-            "gate. Read-only -- cannot modify files."
+            "gate."
         ),
         prompts.ARCHITECT,
-        ["WebSearch", "WebFetch", "Read", "Grep", "Glob"],
+        ["WebSearch", "WebFetch", "Read", "Write", "Edit", "Grep", "Glob"],
     ),
     (
         "backend-coder",
@@ -75,10 +73,10 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
             "Code reviewer. Use to conduct rigorous code review for quality, "
             "correctness, and adherence to the architectural spec. Returns "
             "APPROVE or REQUEST_CHANGES with specific issues. Also used for "
-            "final sign-off during the ship-ready gate. Read-only."
+            "final sign-off during the ship-ready gate."
         ),
         prompts.REVIEWER,
-        ["WebSearch", "WebFetch", "Read", "Grep", "Glob"],
+        ["WebSearch", "WebFetch", "Read", "Write", "Edit", "Grep", "Glob"],
     ),
     (
         "tester",
@@ -100,11 +98,11 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
         (
             "Security auditor. Use to scan the codebase for vulnerabilities, "
             "check OWASP Top 10, audit dependencies, and verify secrets "
-            "management. Returns a severity-rated report. Read-only with "
-            "Bash for running audit commands."
+            "management. Returns a severity-rated report. Has Bash for "
+            "running audit commands."
         ),
         prompts.SECURITY_AUDITOR,
-        ["WebSearch", "WebFetch", "Read", "Grep", "Glob", "Bash"],
+        ["WebSearch", "WebFetch", "Read", "Write", "Edit", "Grep", "Glob", "Bash"],
     ),
     (
         "doc-writer",
@@ -129,7 +127,8 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
         ),
         prompts.PRODUCT_MANAGER,
         [
-            "WebSearch", "WebFetch", "Read", "Grep", "Glob", "Bash",
+            "WebSearch", "WebFetch", "Read", "Write", "Edit", "Grep", "Glob",
+            "Bash",
         ] + BROWSER_TOOLS,
     ),
     (
@@ -141,7 +140,7 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
             "Has Bash for running profiling and benchmarking tools."
         ),
         prompts.PERFORMANCE_OPTIMIZER,
-        ["WebSearch", "WebFetch", "Read", "Grep", "Glob", "Bash"],
+        ["WebSearch", "WebFetch", "Read", "Write", "Edit", "Grep", "Glob", "Bash"],
     ),
     (
         "ux-analyst",
@@ -154,7 +153,7 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
         ),
         prompts.UX_ANALYST,
         [
-            "WebSearch", "WebFetch", "Read", "Grep", "Glob",
+            "WebSearch", "WebFetch", "Read", "Write", "Edit", "Grep", "Glob",
         ] + BROWSER_TOOLS,
     ),
 ]
@@ -169,7 +168,7 @@ def build_agents() -> dict[str, AgentDefinition]:
         agents[name] = _AgentDef(
             description=description,
             prompt=full_prompt,
-            tools=base_tools + COMMS_TOOLS,
+            tools=base_tools,
             memory="project",
         )
     return agents

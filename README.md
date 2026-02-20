@@ -63,20 +63,11 @@ An orchestrator agent acts as a demanding tech lead, driving 12 specialist subag
 
 ### Inter-agent communication
 
-Agents communicate through a shared **message board** -- an in-process MCP server that provides six tools available to every agent:
+Agents communicate through a shared **BOARD.md** file in the working directory. Every agent reads this file at the start of its task and writes its outputs (specs, reports, findings, messages) to labeled `##` sections. This is the primary mechanism for cross-agent context sharing -- no MCP server or custom tooling required, just standard file read/write operations.
 
-| Tool | Purpose |
-|---|---|
-| `send_message` | Post a question, answer, info update, or action request to another agent (or broadcast to all) |
-| `read_messages` | Read messages directed to you or broadcast -- agents check this at task startup |
-| `read_thread` | Follow a conversation thread by ID |
-| `share_artifact` | Store a named output (spec, report, findings) for other agents to pull on demand |
-| `get_artifact` | Retrieve a shared artifact by name |
-| `list_artifacts` | List all available artifacts |
+The researcher writes its brief to `## research-brief`, the architect writes its spec to `## architecture-spec`, the reviewer writes feedback to `## review-feedback` -- and downstream agents read exactly the sections they need. Agents can also post questions, flag blockers, and coordinate dependencies through a `## Messages` section.
 
-This means agents don't rely solely on the orchestrator to relay context. The researcher shares its brief as an artifact, the architect shares its spec, the reviewer shares feedback -- and downstream agents pull exactly what they need. Agents can also ask each other direct questions, flag blockers, and coordinate dependencies through messages.
-
-The orchestrator still coordinates the overall lifecycle and routes unanswered questions, but the message board reduces context loss and enables richer collaboration.
+The orchestrator still coordinates the overall lifecycle and routes unanswered questions, but BOARD.md reduces context loss and enables richer collaboration.
 
 ### Agents
 
@@ -124,6 +115,5 @@ super-system/
     ├── cli.py               # argparse, logging, main()
     ├── orchestrator.py      # run(), message streaming, board wiring
     ├── agents.py            # 12 agent definitions (tools, models)
-    ├── prompts.py           # all prompt constants
-    └── message_board.py     # shared message board + MCP tools
+    └── prompts.py           # all prompt constants
 ```

@@ -76,13 +76,17 @@ async def run(
 
     agents = build_agents()
 
-    orchestrator_prompt = f"{prompts.ORCHESTRATOR}\n\nUSER REQUEST:\n{prompt}"
-
     options = ClaudeAgentOptions(
+        system_prompt={
+            "type": "preset",
+            "preset": "claude_code",
+            "append": prompts.ORCHESTRATOR,
+        },
         allowed_tools=["Task", "Read", "Grep", "Glob"] + COMMS_TOOLS,
         agents=agents,
         mcp_servers={"message-board": mcp_server},
         permission_mode="bypassPermissions",
+        extra_args={"--chrome": None},
     )
 
     if cwd is not None:
@@ -92,9 +96,7 @@ async def run(
         options.debug_stderr = sys.stderr
 
     try:
-        async for message in query(
-            prompt=_as_stream(orchestrator_prompt), options=options
-        ):
+        async for message in query(prompt=_as_stream(prompt), options=options):
             if isinstance(message, AssistantMessage):
                 for block in message.content:
                     if isinstance(block, TextBlock):

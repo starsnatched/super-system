@@ -1,7 +1,17 @@
+from dataclasses import dataclass
+
 from claude_agent_sdk import AgentDefinition
 
 from super_system import prompts
 from super_system.message_board import COMMS_TOOLS
+
+BROWSER_TOOLS = ["mcp__claude-in-chrome"]
+
+
+@dataclass
+class _AgentDef(AgentDefinition):
+    memory: str | None = None
+
 
 _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
     (
@@ -39,11 +49,15 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
         "frontend-coder",
         (
             "Frontend implementation specialist. Use to write UI components, "
-            "pages, styles, and client-side logic. Has full write access and "
-            "can run commands."
+            "pages, styles, and client-side logic. Has full write access, "
+            "can run commands, and has browser access to visually verify "
+            "rendered UI."
         ),
         prompts.FRONTEND_CODER,
-        ["WebSearch", "WebFetch", "Read", "Write", "Edit", "Bash", "Grep", "Glob"],
+        [
+            "WebSearch", "WebFetch", "Read", "Write", "Edit", "Bash",
+            "Grep", "Glob",
+        ] + BROWSER_TOOLS,
     ),
     (
         "infra-coder",
@@ -72,10 +86,14 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
             "QA and testing specialist. Use to write comprehensive test "
             "suites, run tests, stress test the application, and report "
             "failures with root cause analysis. Has write access to create "
-            "test files and run commands."
+            "test files and run commands, and browser access for visual "
+            "and end-to-end UI testing."
         ),
         prompts.TESTER,
-        ["WebSearch", "WebFetch", "Bash", "Read", "Write", "Edit", "Grep", "Glob"],
+        [
+            "WebSearch", "WebFetch", "Bash", "Read", "Write", "Edit",
+            "Grep", "Glob",
+        ] + BROWSER_TOOLS,
     ),
     (
         "security-auditor",
@@ -105,11 +123,14 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
             "original request and produce a prioritized improvement backlog. "
             "Returns SHIP_READY or IMPROVEMENTS_NEEDED with a ranked list "
             "of features, bugfixes, UX issues, and polish items. Use after "
-            "the ship-ready gate to drive continuous improvement. Read-only "
-            "with Bash to run the application."
+            "the ship-ready gate to drive continuous improvement. Has Bash "
+            "to run the application and browser access to interact with "
+            "it as a real user."
         ),
         prompts.PRODUCT_MANAGER,
-        ["WebSearch", "WebFetch", "Read", "Grep", "Glob", "Bash"],
+        [
+            "WebSearch", "WebFetch", "Read", "Grep", "Glob", "Bash",
+        ] + BROWSER_TOOLS,
     ),
     (
         "performance-optimizer",
@@ -128,10 +149,13 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
             "UX and accessibility analyst. Use to review UI components for "
             "WCAG compliance, usability, responsive design, keyboard "
             "navigation, and visual polish. Returns CLEAN or ISSUES_FOUND "
-            "with a severity-rated report. Read-only."
+            "with a severity-rated report. Has browser access to visually "
+            "inspect the rendered application."
         ),
         prompts.UX_ANALYST,
-        ["WebSearch", "WebFetch", "Read", "Grep", "Glob"],
+        [
+            "WebSearch", "WebFetch", "Read", "Grep", "Glob",
+        ] + BROWSER_TOOLS,
     ),
 ]
 
@@ -142,9 +166,10 @@ def build_agents() -> dict[str, AgentDefinition]:
         full_prompt = base_prompt + prompts.AGENT_COMMS_PROTOCOL.format(
             agent_name=name
         )
-        agents[name] = AgentDefinition(
+        agents[name] = _AgentDef(
             description=description,
             prompt=full_prompt,
             tools=base_tools + COMMS_TOOLS,
+            memory="project",
         )
     return agents

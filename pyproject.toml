@@ -8,10 +8,13 @@ dependencies = [
     "claude-agent-sdk>=0.1.37",
     "rich>=13.9",
     "textual>=1.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
 ]
 
 [project.scripts]
 super-system = "super_system.cli:main"
+super-system-server = "super_system.server:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 
 from rich.console import Console
@@ -11,6 +12,7 @@ from rich.theme import Theme
 
 
 AGENT_STYLES: dict[str, str] = {
+    "intake": "bright_blue",
     "researcher": "bright_cyan",
     "architect": "bright_magenta",
     "backend-coder": "bright_green",
@@ -26,6 +28,7 @@ AGENT_STYLES: dict[str, str] = {
 }
 
 AGENT_ICONS: dict[str, str] = {
+    "intake": "◈",
     "researcher": "◇",
     "architect": "△",
     "backend-coder": "◆",
@@ -163,5 +166,81 @@ def print_interrupted() -> None:
 def print_error(message: str) -> None:
     err_console.print()
     err_console.print(f"[error]✗ {message}[/error]")
+
+
+def print_intake_banner() -> None:
+    err_console.print()
+    err_console.print(
+        Panel(
+            Text.assemble(
+                ("◈ ", "bold bright_blue"),
+                ("intake", "bold bright_white"),
+                ("  gathering requirements", "dim"),
+            ),
+            border_style="bright_blue",
+            expand=False,
+            padding=(0, 2),
+        )
+    )
+    err_console.print()
+
+
+def print_intake_tool_use(tool_name: str, description: str = "") -> None:
+    label = Text.assemble(
+        (f"  {_ts()} ", "ts"),
+        ("◈ ", "bold bright_blue"),
+        (tool_name, "bold bright_blue"),
+    )
+    if description:
+        label.append("  ")
+        label.append(description, style="dim")
+    err_console.print(label)
+
+
+def print_intake_crafted(prompt: str) -> None:
+    err_console.print()
+    err_console.print(
+        Panel(
+            Text("Prompt crafted. Handing off to engineering team.", style="bold"),
+            border_style="bright_green",
+            title="[success]✓ Intake complete[/success]",
+            expand=False,
+            padding=(0, 2),
+        )
+    )
+    err_console.print()
+
+
+async def prompt_user_input() -> str | None:
+    loop = asyncio.get_event_loop()
+    err_console.print()
+    err_console.print(
+        Text.assemble(
+            ("  ◈ ", "bold bright_blue"),
+            ("Your turn", "bold bright_blue"),
+            (" (empty line to let the agent decide):", "dim"),
+        )
+    )
+    err_console.print()
+
+    lines: list[str] = []
+    try:
+        while True:
+            line = await loop.run_in_executor(
+                None, lambda: input("  > ")
+            )
+            if line == "":
+                if lines:
+                    break
+                return None
+            lines.append(line)
+    except EOFError:
+        if lines:
+            return "\n".join(lines)
+        return None
+    except KeyboardInterrupt:
+        return None
+
+    return "\n".join(lines)
 
 

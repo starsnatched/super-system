@@ -28,6 +28,7 @@ from textual.widgets import (
 )
 
 from super_system.console import AGENT_ICONS, AGENT_STYLES
+from super_system.intake import IntakeCallbacks, IntakeError, IntakeInterrupted, run_intake
 from super_system.orchestrator import (
     OrchestratorError,
     OrchestratorInterrupted,
@@ -45,6 +46,7 @@ class LaunchConfig:
     cwd: Path | None = None
     verbose: bool = False
     api_key: str | None = None
+    direct: bool = False
 
 
 class HelpScreen(ModalScreen):
@@ -246,10 +248,12 @@ class WelcomeScreen(Screen[LaunchConfig]):
         default_cwd: Path | None = None,
         default_verbose: bool = False,
         default_api_key: str | None = None,
+        default_direct: bool = False,
     ) -> None:
         super().__init__()
         self._default_cwd = default_cwd or Path.cwd()
         self._default_verbose = default_verbose
+        self._default_direct = default_direct
         self._default_api_key = (
             default_api_key
             or os.environ.get("ANTHROPIC_API_KEY", "")
@@ -290,6 +294,9 @@ class WelcomeScreen(Screen[LaunchConfig]):
                 with Horizontal(classes="switch-row"):
                     yield Static("Verbose", classes="switch-label")
                     yield Switch(id="verbose-switch", value=self._default_verbose)
+                with Horizontal(classes="switch-row"):
+                    yield Static("Direct", classes="switch-label")
+                    yield Switch(id="direct-switch", value=self._default_direct)
 
             yield Input(
                 placeholder="What would you like to build?",
@@ -312,12 +319,14 @@ class WelcomeScreen(Screen[LaunchConfig]):
         cwd_raw = self.query_one("#cwd-input", Input).value.strip()
         cwd = Path(cwd_raw).resolve() if cwd_raw else None
         verbose = self.query_one("#verbose-switch", Switch).value
+        direct = self.query_one("#direct-switch", Switch).value
         api_key = self.query_one("#api-key-input", Input).value.strip() or None
         return LaunchConfig(
             prompt=prompt,
             cwd=cwd,
             verbose=verbose,
             api_key=api_key,
+            direct=direct,
         )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -381,6 +390,7 @@ class WelcomeScreen(Screen[LaunchConfig]):
 class InfoBar(Static):
     prompt_text: reactive[str] = reactive("")
     working_dir: reactive[str] = reactive("")
+    phase: reactive[str] = reactive("")
 
     def render(self) -> Text:
         line = Text()
@@ -395,6 +405,12 @@ class InfoBar(Static):
             if len(wd) > 30:
                 wd = "…" + wd[-29:]
             line.append(wd, style="dim italic")
+        if self.phase:
+            line.append("  │  ", style="dim")
+            if self.phase == "intake":
+                line.append("◈ intake", style="bold bright_blue")
+            else:
+                line.append("⚡ building", style="bold bright_yellow")
         return line
 
 
@@ -409,6 +425,11 @@ class StatusBar(Static):
         line = Text()
         status_map = {
             "idle": ("  ○ ready", "dim"),
+            "intake": (
+                f"  {SPINNER_FRAMES[self.spinner_frame % len(SPINNER_FRAMES)]} intake",
+                "bold bright_blue",
+            ),
+            "intake_input": ("  ◈ awaiting input", "bold bright_blue"),
             "running": (
                 f"  {SPINNER_FRAMES[self.spinner_frame % len(SPINNER_FRAMES)]} running",
                 "bold bright_cyan",
@@ -467,6 +488,16 @@ class SuperSystemApp(App):
         border: round $accent;
     }
 
+    #intake-input {
+        dock: bottom;
+        width: 100%;
+        display: none;
+    }
+
+    #intake-input:focus {
+        border: tall $accent;
+    }
+
     #status-bar {
         width: 100%;
         height: 1;
@@ -486,16 +517,19 @@ class SuperSystemApp(App):
         *,
         cwd: Path | None = None,
         verbose: bool = False,
+        direct: bool = False,
     ) -> None:
         super().__init__()
         self._prompt = prompt
         self._cwd = cwd
         self._verbose = verbose
+        self._direct = direct
         self._api_key: str | None = None
         self._start_mono = time.monotonic()
         self._start_wall = time.time()
         self._run_active = False
         self._tick_timer: object | None = None
+        self._intake_input_future: asyncio.Future[str | None] | None = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -518,6 +552,10 @@ class SuperSystemApp(App):
             )
             activity_log.border_title = "Activity"
             yield activity_log
+        yield Input(
+            placeholder="Type your response and press Enter…",
+            id="intake-input",
+        )
         yield StatusBar(id="status-bar")
         yield Footer()
 
@@ -530,6 +568,7 @@ class SuperSystemApp(App):
                     default_cwd=self._cwd,
                     default_verbose=self._verbose,
                     default_api_key=self._api_key,
+                    default_direct=self._direct,
                 ),
                 self._on_welcome,
             )
@@ -539,6 +578,7 @@ class SuperSystemApp(App):
         self._cwd = config.cwd
         self._verbose = config.verbose
         self._api_key = config.api_key
+        self._direct = config.direct
         self._begin_run()
 
     def _begin_run(self) -> None:
@@ -549,17 +589,25 @@ class SuperSystemApp(App):
         info_bar.prompt_text = self._prompt or ""
         info_bar.working_dir = str(self._cwd) if self._cwd else str(Path.cwd())
 
-        status_bar = self.query_one("#status-bar", StatusBar)
-        status_bar.status = "running"
-
-        output = self.query_one("#output-log", RichLog)
-        output.write(Text("  Starting…", style="dim italic"))
-
         self._start_mono = time.monotonic()
         self._start_wall = time.time()
         self._stop_tick()
         self._tick_timer = self.set_interval(0.1, self._tick)
-        self._run_orchestrator()
+
+        if self._direct:
+            info_bar.phase = "building"
+            self.query_one("#status-bar", StatusBar).status = "running"
+            output = self.query_one("#output-log", RichLog)
+            output.write(Text("  Starting…", style="dim italic"))
+            self._run_orchestrator()
+        else:
+            info_bar.phase = "intake"
+            self.query_one("#status-bar", StatusBar).status = "intake"
+            output = self.query_one("#output-log", RichLog)
+            output.write(
+                Text("  ◈ Intake agent gathering requirements…", style="dim italic")
+            )
+            self._run_intake_phase()
 
     def _stop_tick(self) -> None:
         if self._tick_timer is not None:
@@ -568,7 +616,7 @@ class SuperSystemApp(App):
 
     def _tick(self) -> None:
         bar = self.query_one("#status-bar", StatusBar)
-        if bar.status == "running":
+        if bar.status in ("running", "intake"):
             bar.duration_s = time.monotonic() - self._start_mono
             bar.spinner_frame += 1
 
@@ -584,6 +632,7 @@ class SuperSystemApp(App):
         info_bar = self.query_one("#info-bar", InfoBar)
         info_bar.prompt_text = ""
         info_bar.working_dir = ""
+        info_bar.phase = ""
 
         status_bar = self.query_one("#status-bar", StatusBar)
         status_bar.turns = 0
@@ -594,6 +643,41 @@ class SuperSystemApp(App):
 
         self.query_one("#output-log", RichLog).clear()
         self.query_one("#activity-log", RichLog).clear()
+
+        intake_input = self.query_one("#intake-input", Input)
+        intake_input.display = False
+        intake_input.value = ""
+
+    def _show_intake_input(self) -> None:
+        intake_input = self.query_one("#intake-input", Input)
+        intake_input.display = True
+        intake_input.value = ""
+        intake_input.focus()
+        self.query_one("#status-bar", StatusBar).status = "intake_input"
+
+    def _hide_intake_input(self) -> None:
+        intake_input = self.query_one("#intake-input", Input)
+        intake_input.display = False
+        intake_input.value = ""
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id != "intake-input":
+            return
+        if self._intake_input_future is None or self._intake_input_future.done():
+            return
+        value = event.value.strip()
+        self._hide_intake_input()
+        output = self.query_one("#output-log", RichLog)
+        if value:
+            output.write(Text(f"\n  You: {value}\n", style="bold white"))
+            self._intake_input_future.set_result(value)
+        else:
+            self._intake_input_future.set_result(None)
+
+    async def _get_intake_input(self) -> str | None:
+        self._intake_input_future = asyncio.get_event_loop().create_future()
+        self.call_from_thread(self._show_intake_input)
+        return await self._intake_input_future
 
     def action_show_help(self) -> None:
         self.push_screen(HelpScreen())
@@ -608,9 +692,113 @@ class SuperSystemApp(App):
                 default_cwd=self._cwd,
                 default_verbose=self._verbose,
                 default_api_key=self._api_key,
+                default_direct=self._direct,
             ),
             self._on_welcome,
         )
+
+    @work(thread=False)
+    async def _run_intake_phase(self) -> None:
+        prompt = self._prompt
+        if not prompt:
+            return
+
+        output = self.query_one("#output-log", RichLog)
+        activity = self.query_one("#activity-log", RichLog)
+        status_bar = self.query_one("#status-bar", StatusBar)
+
+        def on_text(text: str) -> None:
+            output.write(Markdown(text))
+
+        def on_tool_use(tool_name: str, description: str = "") -> None:
+            line = Text()
+            line.append(f"{self._ts()} ", style="dim green")
+            line.append("◈ ", style="bold bright_blue")
+            line.append(tool_name, style="bold bright_blue")
+            if description:
+                line.append("  ")
+                line.append(description, style="dim")
+            activity.write(line)
+
+        def on_crafted(crafted_prompt: str) -> None:
+            output.write(Text())
+            output.write(
+                Panel(
+                    Text(
+                        "Prompt crafted. Handing off to engineering team.",
+                        style="bold",
+                    ),
+                    border_style="bright_green",
+                    title="[green]✓ Intake complete[/green]",
+                    expand=False,
+                    padding=(0, 2),
+                )
+            )
+            activity.write(
+                Text(f"{self._ts()}  ✓ Intake complete", style="bold bright_green")
+            )
+
+        def on_interrupted() -> None:
+            status_bar.status = "interrupted"
+            activity.write(
+                Text(f"{self._ts()}  ⚠ Interrupted", style="bold yellow")
+            )
+
+        def on_error(msg: str) -> None:
+            output.write(Text(f"\n✗ {msg}", style="bold red"))
+            status_bar.status = "failed"
+
+        callbacks = IntakeCallbacks(
+            on_text=on_text,
+            on_tool_use=on_tool_use,
+            get_user_input=self._get_intake_input,
+            on_crafted=on_crafted,
+            on_interrupted=on_interrupted,
+            on_error=on_error,
+        )
+
+        try:
+            crafted_prompt = await run_intake(
+                prompt,
+                cwd=self._cwd,
+                verbose=self._verbose,
+                callbacks=callbacks,
+                handle_signals=False,
+            )
+        except IntakeInterrupted:
+            status_bar.status = "interrupted"
+            self._run_active = False
+            self._stop_tick()
+            return
+        except IntakeError:
+            status_bar.status = "failed"
+            self._run_active = False
+            self._stop_tick()
+            return
+        except asyncio.CancelledError:
+            self._run_active = False
+            self._stop_tick()
+            return
+        except Exception as exc:
+            status_bar.status = "failed"
+            output.write(
+                Text(f"\n✗ Intake error: {exc}", style="bold red")
+            )
+            self._run_active = False
+            self._stop_tick()
+            return
+
+        self._hide_intake_input()
+        self._prompt = crafted_prompt
+
+        info_bar = self.query_one("#info-bar", InfoBar)
+        info_bar.phase = "building"
+        status_bar.status = "running"
+
+        output.write(Text())
+        output.write(Text("  Starting orchestrator…", style="dim italic"))
+
+        self._run_orchestrator()
 
     @work(thread=False)
     async def _run_orchestrator(self) -> None:

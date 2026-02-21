@@ -560,7 +560,7 @@ class SuperSystemApp(App):
         self._start_wall = time.time()
         self._run_active = False
         self._tick_timer: object | None = None
-        self._intake_input_future: asyncio.Future[str | None] | None = None
+        self._intake_queue: asyncio.Queue[str | None] = asyncio.Queue()
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -683,6 +683,11 @@ class SuperSystemApp(App):
 
         self.query_one("#intake-container").display = False
         self.query_one("#intake-text", TextArea).clear()
+        while not self._intake_queue.empty():
+            try:
+                self._intake_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
 
     def _show_intake_input(self) -> None:
         container = self.query_one("#intake-container")
@@ -697,8 +702,6 @@ class SuperSystemApp(App):
         self.query_one("#intake-text", TextArea).clear()
 
     def _submit_intake_text(self) -> None:
-        if self._intake_input_future is None or self._intake_input_future.done():
-            return
         text_area = self.query_one("#intake-text", TextArea)
         value = text_area.text.strip()
         self._hide_intake_input()
@@ -707,15 +710,16 @@ class SuperSystemApp(App):
             for line in value.split("\n"):
                 output.write(Text(f"  > {line}", style="bold white"))
             output.write(Text())
-            self._intake_input_future.set_result(value)
+            self.query_one("#status-bar", StatusBar).status = "intake"
+            self._intake_queue.put_nowait(value)
         else:
-            self._intake_input_future.set_result(None)
+            self.query_one("#status-bar", StatusBar).status = "intake"
+            self._intake_queue.put_nowait(None)
 
     def _submit_intake_done(self) -> None:
-        if self._intake_input_future is None or self._intake_input_future.done():
-            return
         self._hide_intake_input()
-        self._intake_input_future.set_result(None)
+        self.query_one("#status-bar", StatusBar).status = "intake"
+        self._intake_queue.put_nowait(None)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "intake-send":
@@ -724,9 +728,8 @@ class SuperSystemApp(App):
             self._submit_intake_done()
 
     async def _get_intake_input(self) -> str | None:
-        self._intake_input_future = asyncio.get_event_loop().create_future()
         self._show_intake_input()
-        return await self._intake_input_future
+        return await self._intake_queue.get()
 
     def action_show_help(self) -> None:
         self.push_screen(HelpScreen())

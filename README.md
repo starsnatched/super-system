@@ -123,18 +123,3 @@ The orchestrator has a set of development activities it can invoke in any order,
 | Delivery | `doc-writer` + `tester` | Updates docs, runs final test suite, prints summary |
 
 The typical first-pass order is Research -> Architecture -> Implementation -> Review -> Testing -> Security -> Documentation -> Ship-Ready Gate -> Improvement -> Delivery, but the orchestrator navigates non-linearly: a test failure sends it back to implementation, a code review finding might trigger re-architecture, a security issue during improvement loops back through implementation and testing. Each activity has retry limits to prevent infinite loops, and the orchestrator tracks its navigation to detect and break out of unproductive cycles.
-
-## Project structure
-
-```
-super-system/
-├── main.py                  # entry point shim
-├── pyproject.toml
-└── super_system/
-    ├── __init__.py
-    ├── __main__.py          # python -m super_system
-    ├── cli.py               # argparse, logging, main()
-    ├── orchestrator.py      # run(), message streaming, board wiring
-    ├── agents.py            # 12 agent definitions (tools, models)
-    └── prompts.py           # all prompt constants
-```

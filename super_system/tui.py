@@ -25,6 +25,7 @@ from textual.widgets import (
     RichLog,
     Static,
     Switch,
+    TextArea,
 )
 
 from super_system.console import AGENT_ICONS, AGENT_STYLES
@@ -488,14 +489,44 @@ class SuperSystemApp(App):
         border: round $accent;
     }
 
-    #intake-input {
+    #intake-container {
         dock: bottom;
         width: 100%;
+        height: auto;
+        max-height: 14;
         display: none;
+        padding: 0 1;
     }
 
-    #intake-input:focus {
+    #intake-text {
+        height: 6;
+        width: 100%;
+    }
+
+    #intake-text:focus {
         border: tall $accent;
+    }
+
+    #intake-controls {
+        width: 100%;
+        height: 3;
+        align: right middle;
+    }
+
+    #intake-hint {
+        width: 1fr;
+        content-align: left middle;
+        color: $text-muted;
+        padding: 0 1;
+    }
+
+    #intake-send {
+        min-width: 12;
+        margin: 0 1 0 0;
+    }
+
+    #intake-done {
+        min-width: 12;
     }
 
     #status-bar {
@@ -552,10 +583,16 @@ class SuperSystemApp(App):
             )
             activity_log.border_title = "Activity"
             yield activity_log
-        yield Input(
-            placeholder="Type your response and press Enter…",
-            id="intake-input",
-        )
+        with Vertical(id="intake-container"):
+            yield TextArea(id="intake-text")
+            with Horizontal(id="intake-controls"):
+                yield Static(
+                    "[dim]Type your answers, then [white]Send[/white]. "
+                    "[white]Done[/white] = hand off to engineering team.[/dim]",
+                    id="intake-hint",
+                )
+                yield Button("Send", id="intake-send", variant="primary")
+                yield Button("Done", id="intake-done", variant="default")
         yield StatusBar(id="status-bar")
         yield Footer()
 
@@ -644,39 +681,51 @@ class SuperSystemApp(App):
         self.query_one("#output-log", RichLog).clear()
         self.query_one("#activity-log", RichLog).clear()
 
-        intake_input = self.query_one("#intake-input", Input)
-        intake_input.display = False
-        intake_input.value = ""
+        self.query_one("#intake-container").display = False
+        self.query_one("#intake-text", TextArea).clear()
 
     def _show_intake_input(self) -> None:
-        intake_input = self.query_one("#intake-input", Input)
-        intake_input.display = True
-        intake_input.value = ""
-        intake_input.focus()
+        container = self.query_one("#intake-container")
+        container.display = True
+        text_area = self.query_one("#intake-text", TextArea)
+        text_area.clear()
+        text_area.focus()
         self.query_one("#status-bar", StatusBar).status = "intake_input"
 
     def _hide_intake_input(self) -> None:
-        intake_input = self.query_one("#intake-input", Input)
-        intake_input.display = False
-        intake_input.value = ""
+        self.query_one("#intake-container").display = False
+        self.query_one("#intake-text", TextArea).clear()
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        if event.input.id != "intake-input":
-            return
+    def _submit_intake_text(self) -> None:
         if self._intake_input_future is None or self._intake_input_future.done():
             return
-        value = event.value.strip()
+        text_area = self.query_one("#intake-text", TextArea)
+        value = text_area.text.strip()
         self._hide_intake_input()
         output = self.query_one("#output-log", RichLog)
         if value:
-            output.write(Text(f"\n  You: {value}\n", style="bold white"))
+            for line in value.split("\n"):
+                output.write(Text(f"  > {line}", style="bold white"))
+            output.write(Text())
             self._intake_input_future.set_result(value)
         else:
             self._intake_input_future.set_result(None)
 
+    def _submit_intake_done(self) -> None:
+        if self._intake_input_future is None or self._intake_input_future.done():
+            return
+        self._hide_intake_input()
+        self._intake_input_future.set_result(None)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "intake-send":
+            self._submit_intake_text()
+        elif event.button.id == "intake-done":
+            self._submit_intake_done()
+
     async def _get_intake_input(self) -> str | None:
         self._intake_input_future = asyncio.get_event_loop().create_future()
-        self.call_from_thread(self._show_intake_input)
+        self._show_intake_input()
         return await self._intake_input_future
 
     def action_show_help(self) -> None:

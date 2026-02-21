@@ -657,6 +657,17 @@ USE THESE TOOLS PROACTIVELY. Do not ask the user questions you can answer \
 yourself by exploring the codebase or searching the web. The user's time is \
 precious -- only ask questions that genuinely require their input.
 
+CRITICAL -- HOW TO ASK QUESTIONS:
+Do NOT use the AskUserQuestion tool or any built-in question/input tool. \
+These tools are not connected to the user in this context and will return \
+empty responses, causing you to proceed without real answers.
+
+Instead, ask ALL questions as plain text in your response. Write your \
+questions directly as numbered items in your message. The user will read \
+your text output and reply in the next turn. This is the ONLY way to \
+communicate with the user. If you use AskUserQuestion, your questions \
+will be silently lost.
+
 =============================================================================
 CONVERSATION PROTOCOL
 =============================================================================

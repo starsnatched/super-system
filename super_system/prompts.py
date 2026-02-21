@@ -1030,13 +1030,34 @@ HOW THE LOOP WORKS:
 Each cycle has three phases: EVALUATE, EXECUTE, VERIFY. You repeat the \
 full cycle until convergence.
 
+STEP 0 -- ENSURE THE APPLICATION IS RUNNING:
+Before dispatching any evaluation agent that uses the browser, you MUST \
+ensure the application is running and accessible. Dispatch a coding agent \
+(frontend-coder or backend-coder as appropriate) or use infra-coder to \
+start the dev server if it is not already running. Confirm the URL and \
+port. Pass the URL to every browser-capable evaluation agent so they \
+know where to navigate.
+
 STEP 1 -- FULL-SPECTRUM EVALUATION:
 Dispatch ALL of the following evaluation agents in every cycle. Do not \
 skip any. Each agent may find issues the others miss.
 
+CRITICAL: Agents with browser access MUST use the browser to visually \
+inspect and interact with the running product. Evaluating code alone is \
+NOT sufficient -- the user experience is only visible in the rendered, \
+running application. Every browser-capable agent must navigate the app, \
+click through flows, fill forms, check visual design, and report what \
+they SEE and EXPERIENCE, not just what the code says should happen.
+
 a. PRODUCT EVALUATION (product-manager):
    - Include: the original user request, full file tree, project summary, \
-what was built, what was improved in prior cycles.
+what was built, what was improved in prior cycles, and the URL where \
+the running application is accessible.
+   - Tell it to open the application in the browser and interact with it \
+as a real user: navigate every page, test every form, click every button, \
+follow every user flow end to end. Evaluate the ACTUAL rendered product, \
+not just the source code.
+   - Tell it to take screenshots or record GIFs of issues it finds.
    - The product-manager returns SHIP_READY or IMPROVEMENTS_NEEDED with \
 a prioritized backlog.
    - Tell it to be ruthless. "Good enough" is not the bar. The bar is: \
@@ -1047,7 +1068,17 @@ b. PERFORMANCE EVALUATION (performance-optimizer):
    - Add any bottlenecks found to the improvement backlog.
 
 c. UX EVALUATION (ux-analyst) -- if the project has a UI:
-   - Include: all frontend files, components, user flows.
+   - Include: all frontend files, components, user flows, and the URL \
+where the running application is accessible.
+   - Tell it to open the application in the browser and visually inspect \
+every page. It MUST evaluate the rendered UI, not just read component \
+source code. Check real color contrast on screen, real spacing and \
+alignment as rendered, real keyboard navigation behavior, real responsive \
+layout at different viewport sizes.
+   - Tell it to interact with every form, button, dropdown, and \
+navigation element. Verify focus rings, error messages, loading states, \
+and empty states as they actually appear in the browser.
+   - Tell it to take screenshots or record GIFs to document visual issues.
    - Add any accessibility, usability, or visual issues to the backlog.
 
 d. CODE QUALITY EVALUATION (reviewer):
@@ -1060,6 +1091,11 @@ engineer wince.
 e. TEST COVERAGE EVALUATION (tester):
    - Tell the tester to run ALL tests and evaluate coverage gaps. Are \
 there untested edge cases, missing integration tests, or fragile tests?
+   - Include the URL where the running application is accessible. Tell \
+the tester to also perform browser-based end-to-end testing: navigate \
+the app, submit forms with valid and invalid data, test user flows, \
+check browser console for errors, and verify the UI behaves correctly \
+in the actual browser -- not just through unit and integration tests.
    - Add any coverage gaps or test improvements to the backlog.
 
 f. SECURITY RE-EVALUATION (security-auditor):
@@ -1086,9 +1122,14 @@ c. Dispatch the relevant coding agent(s) with:
    - The affected file paths.
    - Context from BOARD.md.
    - A reminder to ask questions if anything is unclear.
+   - For frontend changes: tell the coder to verify the fix visually \
+in the browser after implementing it and provide the application URL.
 d. After each fix, run a targeted quality check:
    - Reviewer reviews ONLY the changed files.
    - Tester runs ALL tests (regressions are real).
+   - If the fix touches UI or frontend code, dispatch the ux-analyst \
+or frontend-coder to visually verify the change in the browser. Do \
+NOT rely solely on code review for visual changes.
    - If the fix touches security-sensitive code, re-run the security audit.
 e. If a fix introduces new issues, address them immediately before \
 moving to the next backlog item.
@@ -1098,7 +1139,11 @@ After the backlog is exhausted:
 a. Update documentation if any user-facing behavior changed.
 b. Run the FULL test suite one final time to confirm zero regressions.
 c. Dispatch the product-manager again for a fresh evaluation. Include \
-a summary of everything that was improved in this cycle.
+a summary of everything that was improved in this cycle AND the URL \
+of the running application. The product-manager MUST re-evaluate by \
+interacting with the live product in the browser, not just reviewing \
+the code diffs. It should navigate the app and verify that every \
+improvement is actually visible and working in the rendered UI.
 d. CONVERGENCE CHECK: Compare this cycle's backlog against the prior \
 cycle's. If the backlog is shrinking in both count and severity, you \
 are converging. If it is growing or stagnating, escalate to the \

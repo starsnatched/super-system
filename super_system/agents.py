@@ -6,6 +6,8 @@ from super_system import prompts
 
 BROWSER_TOOLS = ["mcp__claude-in-chrome"]
 
+_BROWSER_AGENTS = {"frontend-coder", "tester", "product-manager", "ux-analyst"}
+
 
 @dataclass
 class _AgentDef(AgentDefinition):
@@ -163,9 +165,10 @@ _AGENT_DEFS: list[tuple[str, str, str, list[str]]] = [
 def build_agents() -> dict[str, AgentDefinition]:
     agents: dict[str, AgentDefinition] = {}
     for name, description, base_prompt, base_tools in _AGENT_DEFS:
-        full_prompt = base_prompt + prompts.AGENT_COMMS_PROTOCOL.format(
-            agent_name=name
-        )
+        full_prompt = base_prompt
+        if name in _BROWSER_AGENTS:
+            full_prompt += prompts.BROWSER_VERIFICATION_PROTOCOL
+        full_prompt += prompts.AGENT_COMMS_PROTOCOL.format(agent_name=name)
         agents[name] = _AgentDef(
             description=description,
             prompt=full_prompt,

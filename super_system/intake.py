@@ -26,7 +26,6 @@ logger = logging.getLogger("super_system.intake")
 
 MAX_CONVERSATION_TURNS = 15
 
-
 class IntakeInterrupted(Exception):
     pass
 

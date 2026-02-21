@@ -698,8 +698,9 @@ class SuperSystemApp(App):
         self.query_one("#status-bar", StatusBar).status = "intake_input"
 
     def _hide_intake_input(self) -> None:
-        self.query_one("#intake-container").display = False
         self.query_one("#intake-text", TextArea).clear()
+        self.query_one("#intake-container").display = False
+        self.query_one("#output-log", RichLog).focus()
 
     def _submit_intake_text(self) -> None:
         text_area = self.query_one("#intake-text", TextArea)

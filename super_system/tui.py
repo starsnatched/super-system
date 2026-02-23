@@ -28,6 +28,7 @@ from textual.widgets import (
     TextArea,
 )
 
+from super_system.cleanup import kill_descendant_processes
 from super_system.console import AGENT_ICONS, AGENT_STYLES
 from super_system.intake import IntakeCallbacks, IntakeError, IntakeInterrupted, run_intake
 from super_system.orchestrator import (
@@ -537,7 +538,7 @@ class SuperSystemApp(App):
     """
 
     BINDINGS = [
-        Binding("q", "quit", "Quit", priority=True),
+        Binding("q", "request_quit", "Quit", priority=True),
         Binding("question_mark", "show_help", "Help"),
         Binding("n", "new_run", "New Run"),
     ]
@@ -734,6 +735,13 @@ class SuperSystemApp(App):
 
     def action_show_help(self) -> None:
         self.push_screen(HelpScreen())
+
+    def action_request_quit(self) -> None:
+        kill_descendant_processes()
+        self.exit()
+
+    def on_unmount(self) -> None:
+        kill_descendant_processes()
 
     def action_new_run(self) -> None:
         if self._run_active:

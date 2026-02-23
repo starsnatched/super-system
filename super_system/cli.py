@@ -23,6 +23,10 @@ from super_system.orchestrator import OrchestratorError, OrchestratorInterrupted
 
 
 def main() -> None:
+    from super_system.cleanup import register_cleanup
+
+    register_cleanup()
+
     parser = argparse.ArgumentParser(
         description="Multi-agent software engineering team powered by Claude",
     )

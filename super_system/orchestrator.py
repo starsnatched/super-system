@@ -4,7 +4,9 @@ import asyncio
 import logging
 import signal
 import sys
+import time
 from collections.abc import AsyncIterator, Callable
+from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -21,6 +23,7 @@ from claude_agent_sdk import (
 
 from super_system import prompts
 from super_system.agents import build_agents
+from super_system.cleanup import STALL_TIMEOUT_S, kill_descendant_processes
 
 logger = logging.getLogger("super_system.orchestrator")
 
@@ -122,8 +125,29 @@ async def run(
     if verbose:
         options.debug_stderr = sys.stderr
 
+    last_activity = time.monotonic()
+    stalled = False
+
+    async def _watchdog() -> None:
+        nonlocal stalled
+        while True:
+            await asyncio.sleep(30)
+            idle = time.monotonic() - last_activity
+            if idle > STALL_TIMEOUT_S:
+                logger.warning(
+                    "Pipeline stalled (no activity for %.0fs), interrupting",
+                    idle,
+                )
+                stalled = True
+                for task in asyncio.all_tasks(loop):
+                    task.cancel()
+                return
+
+    watchdog_task = asyncio.create_task(_watchdog())
+
     try:
         async for message in query(prompt=_as_stream(prompt), options=options):
+            last_activity = time.monotonic()
             try:
                 if isinstance(message, AssistantMessage):
                     for block in message.content:
@@ -150,6 +174,11 @@ async def run(
             except Exception as exc:
                 logger.warning("Error processing message: %s", exc, exc_info=True)
     except asyncio.CancelledError:
+        if stalled:
+            cb.on_error(
+                "Pipeline stalled — no activity for "
+                f"{STALL_TIMEOUT_S // 60} minutes. Interrupted automatically."
+            )
         cb.on_interrupted()
         raise OrchestratorInterrupted() from None
     except KeyboardInterrupt:
@@ -160,6 +189,11 @@ async def run(
             lambda e: isinstance(e, (asyncio.CancelledError, KeyboardInterrupt))
         )
         if real is None:
+            if stalled:
+                cb.on_error(
+                    "Pipeline stalled — no activity for "
+                    f"{STALL_TIMEOUT_S // 60} minutes. Interrupted automatically."
+                )
             cb.on_interrupted()
             raise OrchestratorInterrupted() from None
         for exc in real.exceptions:
@@ -170,3 +204,8 @@ async def run(
     except Exception as exc:
         logger.warning("Orchestrator error (ignored): %s", exc, exc_info=True)
         cb.on_error(str(exc) or type(exc).__name__)
+    finally:
+        watchdog_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await watchdog_task
+        kill_descendant_processes()

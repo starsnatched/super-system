@@ -4,7 +4,9 @@ import asyncio
 import logging
 import signal
 import sys
+import time
 from collections.abc import AsyncIterator, Callable, Awaitable
+from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -21,6 +23,7 @@ from claude_agent_sdk import (
 
 from super_system import prompts
 from super_system.agents import BROWSER_TOOLS
+from super_system.cleanup import STALL_TIMEOUT_S, kill_descendant_processes
 
 logger = logging.getLogger("super_system.intake")
 
@@ -103,30 +106,53 @@ async def _run_turn(
 
     collected_text: list[str] = []
     captured_session_id = session_id
+    last_activity = time.monotonic()
+    loop = asyncio.get_running_loop()
 
-    async for message in query(prompt=_as_stream(prompt_text), options=options):
-        if isinstance(message, SystemMessage):
-            if hasattr(message, "subtype") and message.subtype == "init":
-                sid = (
-                    message.data.get("session_id")
-                    if isinstance(message.data, dict)
-                    else None
+    async def _watchdog() -> None:
+        while True:
+            await asyncio.sleep(30)
+            idle = time.monotonic() - last_activity
+            if idle > STALL_TIMEOUT_S:
+                logger.warning(
+                    "Intake stalled (no activity for %.0fs), interrupting",
+                    idle,
                 )
-                if sid:
-                    captured_session_id = sid
-        elif isinstance(message, AssistantMessage):
-            for block in message.content:
-                if isinstance(block, TextBlock):
-                    collected_text.append(block.text)
-                    cb.on_text(block.text)
-                elif isinstance(block, ToolUseBlock):
-                    desc = ""
-                    if isinstance(block.input, dict):
-                        desc = block.input.get("description", "")
-                    cb.on_tool_use(block.name, desc)
-        elif isinstance(message, ResultMessage):
-            if message.is_error:
-                logger.warning("Intake turn error: %s", message.result)
+                for task in asyncio.all_tasks(loop):
+                    task.cancel()
+                return
+
+    watchdog_task = asyncio.create_task(_watchdog())
+
+    try:
+        async for message in query(prompt=_as_stream(prompt_text), options=options):
+            last_activity = time.monotonic()
+            if isinstance(message, SystemMessage):
+                if hasattr(message, "subtype") and message.subtype == "init":
+                    sid = (
+                        message.data.get("session_id")
+                        if isinstance(message.data, dict)
+                        else None
+                    )
+                    if sid:
+                        captured_session_id = sid
+            elif isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        collected_text.append(block.text)
+                        cb.on_text(block.text)
+                    elif isinstance(block, ToolUseBlock):
+                        desc = ""
+                        if isinstance(block.input, dict):
+                            desc = block.input.get("description", "")
+                        cb.on_tool_use(block.name, desc)
+            elif isinstance(message, ResultMessage):
+                if message.is_error:
+                    logger.warning("Intake turn error: %s", message.result)
+    finally:
+        watchdog_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await watchdog_task
 
     return "\n".join(collected_text), captured_session_id
 
@@ -211,3 +237,5 @@ async def run_intake(
         logger.warning("Intake error: %s", exc, exc_info=True)
         cb.on_error(str(exc) or type(exc).__name__)
         raise IntakeError(str(exc)) from exc
+    finally:
+        kill_descendant_processes()

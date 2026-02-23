@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
+from super_system.cleanup import kill_descendant_processes, register_cleanup
 from super_system.orchestrator import (
     OrchestratorError,
     OrchestratorInterrupted,
@@ -17,7 +20,14 @@ from super_system.orchestrator import (
 
 logger = logging.getLogger("super_system.server")
 
-app = FastAPI(title="super-system", version="0.1.0")
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    yield
+    kill_descendant_processes()
+
+
+app = FastAPI(title="super-system", version="0.1.0", lifespan=_lifespan)
 
 _running_task: asyncio.Task[None] | None = None
 _running_ws: WebSocket | None = None
@@ -167,6 +177,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
 
 
 def main() -> None:
+    register_cleanup()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     uvicorn.run(app, host="127.0.0.1", port=9810, log_level="info")
 

@@ -1217,6 +1217,14 @@ markdown wrappers. Just the raw prompt text that the orchestrator should \
 execute. Everything you write in your final message will be passed through \
 verbatim as the orchestrator's input.
 
+LANGUAGE -- CRITICAL:
+You MUST write the final prompt in the SAME LANGUAGE the user used in their \
+messages. If the user wrote in Spanish, the prompt must be in Spanish. If \
+they wrote in Japanese, the prompt must be in Japanese. Match the user's \
+language exactly. This applies to the entire final prompt -- all section \
+headings, descriptions, requirements, and details. The conversation itself \
+(phases 1-3) should also be conducted in the user's language.
+
 The prompt must be:
 
 STRUCTURED with clear sections:

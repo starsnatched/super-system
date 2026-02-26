@@ -24,6 +24,10 @@ from claude_agent_sdk import (
 from super_system import prompts
 from super_system.agents import build_agents
 from super_system.cleanup import STALL_TIMEOUT_S, kill_descendant_processes
+from super_system.config import load_api_key, load_skill_registries
+from super_system.skills import SKILL_TOOL_NAMES, auto_discover, create_skills_mcp_server
+
+_IS_WINDOWS = sys.platform == "win32"
 
 logger = logging.getLogger("super_system.orchestrator")
 
@@ -102,10 +106,30 @@ async def run(
             for task in asyncio.all_tasks(loop):
                 task.cancel()
 
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(sig, _handle_signal, sig)
+        if _IS_WINDOWS:
+            signal.signal(signal.SIGINT, _handle_signal)
+            signal.signal(signal.SIGTERM, _handle_signal)
+        else:
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                loop.add_signal_handler(sig, _handle_signal, sig)
+
+    effective_cwd = cwd or Path.cwd()
+    api_key = load_api_key()
+    registry_urls = load_skill_registries()
+
+    try:
+        installed = await auto_discover(
+            prompt, effective_cwd, api_key=api_key, registry_urls=registry_urls
+        )
+        if installed:
+            logger.info("Pre-session skill discovery installed: %s", installed)
+    except Exception as exc:
+        logger.warning("Pre-session skill discovery failed (continuing): %s", exc)
 
     agents = build_agents()
+    skills_server = create_skills_mcp_server(
+        cwd=effective_cwd, api_key=api_key, registry_urls=registry_urls
+    )
 
     options = ClaudeAgentOptions(
         system_prompt={
@@ -113,10 +137,12 @@ async def run(
             "preset": "claude_code",
             "append": prompts.ORCHESTRATOR,
         },
-        allowed_tools=["Task", "Read", "Grep", "Glob"],
+        allowed_tools=["Task", "Read", "Grep", "Glob"] + SKILL_TOOL_NAMES,
         agents=agents,
         permission_mode="bypassPermissions",
         model="opus",
+        setting_sources=["user", "project"],
+        mcp_servers={"skills": skills_server},
         extra_args={"chrome": None},
     )
 

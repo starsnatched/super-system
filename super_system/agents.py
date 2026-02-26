@@ -172,7 +172,7 @@ def build_agents() -> dict[str, AgentDefinition]:
         agents[name] = _AgentDef(
             description=description,
             prompt=full_prompt,
-            tools=base_tools,
+            tools=base_tools + ["Skill"],
             model="opus",
             memory="project",
         )

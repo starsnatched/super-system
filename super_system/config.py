@@ -29,3 +29,13 @@ def save_api_key(key: str) -> None:
     config = _load_config()
     config["api_key"] = key
     _save_config(config)
+
+
+def load_skill_registries() -> list[str]:
+    return _load_config().get("skill_registries", [])
+
+
+def save_skill_registries(urls: list[str]) -> None:
+    config = _load_config()
+    config["skill_registries"] = urls
+    _save_config(config)

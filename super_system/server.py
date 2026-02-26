@@ -61,14 +61,15 @@ async def _run_task(
 ) -> None:
     global _running_task, _running_ws
     _running_ws = ws
+    loop = asyncio.get_running_loop()
 
     def on_text(text: str) -> None:
-        asyncio.get_event_loop().create_task(
+        loop.create_task(
             _send(ws, {"type": "text", "content": text})
         )
 
     def on_agent_dispatch(agent_name: str, description: str = "") -> None:
-        asyncio.get_event_loop().create_task(
+        loop.create_task(
             _send(ws, {"type": "agent_dispatch", "agent": agent_name, "description": description})
         )
 
@@ -79,7 +80,7 @@ async def _run_task(
         is_error: bool = False,
         error_text: str = "",
     ) -> None:
-        asyncio.get_event_loop().create_task(
+        loop.create_task(
             _send(ws, {
                 "type": "result",
                 "turns": num_turns,
@@ -91,12 +92,12 @@ async def _run_task(
         )
 
     def on_interrupted() -> None:
-        asyncio.get_event_loop().create_task(
+        loop.create_task(
             _send(ws, {"type": "interrupted"})
         )
 
     def on_error(message: str) -> None:
-        asyncio.get_event_loop().create_task(
+        loop.create_task(
             _send(ws, {"type": "error", "message": message})
         )
 

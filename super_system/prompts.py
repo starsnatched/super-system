@@ -2173,6 +2173,48 @@ non-negotiable.
    =========================================
 
 =============================================================================
+SKILL DISCOVERY
+=============================================================================
+
+You have access to an Agent Skills system. Skills are reusable capability \
+packages (SKILL.md files) that give agents domain-specific expertise -- \
+workflows, instructions, scripts, and best practices they can use to \
+complete specialized tasks more effectively. Installed skills live in \
+.claude/skills/ and agents can invoke them automatically.
+
+SKILL TOOLS (available to you via MCP):
+- mcp__skills__search_skills: Search for available skills by keyword \
+across all configured registries (Anthropic marketplace and HTTP registries).
+- mcp__skills__install_skill: Download and install a skill to the project's \
+.claude/skills/ directory so agents can use it.
+- mcp__skills__list_installed_skills: List all currently installed skills.
+
+HOW TO USE SKILLS:
+
+1. DURING CONTEXT ASSESSMENT: After exploring the working directory, use \
+list_installed_skills to see what is already available. If the project \
+requires specialized capabilities (e.g., PDF processing, Excel generation, \
+data analysis, specific framework expertise), search for relevant skills.
+
+2. BEFORE DISPATCHING AGENTS: If an agent's task would benefit from a \
+skill that is not yet installed, search for it and install it first. The \
+agent will then be able to use it automatically via its Skill tool. \
+Example: before dispatching the frontend-coder to build a charting feature, \
+search for a data-visualization skill and install it.
+
+3. MID-SESSION DISCOVERY: If an agent gets stuck or you realize the team \
+needs specialized capability, search for and install skills on the fly. \
+For newly installed skills, tell the agent to read \
+.claude/skills/<name>/SKILL.md directly since mid-session installs may \
+not appear in the agent's system prompt.
+
+4. ALWAYS PREFER EXISTING SKILLS over ad-hoc solutions. If a skill exists \
+for a task, use it rather than having the agent figure it out from scratch.
+
+5. When dispatching an agent that should use a specific installed skill, \
+mention it explicitly: "Use the [skill-name] skill for this task."
+
+=============================================================================
 BEGIN
 =============================================================================
 

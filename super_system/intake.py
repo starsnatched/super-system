@@ -25,9 +25,16 @@ from super_system import prompts
 from super_system.agents import BROWSER_TOOLS
 from super_system.cleanup import STALL_TIMEOUT_S, kill_descendant_processes
 
+_IS_WINDOWS = sys.platform == "win32"
+
 logger = logging.getLogger("super_system.intake")
 
 MAX_CONVERSATION_TURNS = 15
+
+
+async def _noop_get_input() -> str | None:
+    return None
+
 
 class IntakeInterrupted(Exception):
     pass
@@ -42,7 +49,7 @@ class IntakeCallbacks:
     on_text: Callable[[str], Any] = field(default=lambda t: None)
     on_tool_use: Callable[[str, str], Any] = field(default=lambda n, d="": None)
     get_user_input: Callable[[], Awaitable[str | None]] = field(
-        default=lambda: asyncio.coroutine(lambda: None)()  # type: ignore[arg-type]
+        default=lambda: _noop_get_input()
     )
     on_crafted: Callable[[str], Any] = field(default=lambda p: None)
     on_interrupted: Callable[[], Any] = field(default=lambda: None)
@@ -180,8 +187,12 @@ async def run_intake(
             for task in asyncio.all_tasks(loop):
                 task.cancel()
 
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(sig, _handle_signal, sig)
+        if _IS_WINDOWS:
+            signal.signal(signal.SIGINT, _handle_signal)
+            signal.signal(signal.SIGTERM, _handle_signal)
+        else:
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                loop.add_signal_handler(sig, _handle_signal, sig)
 
     session_id: str | None = None
     last_response = ""

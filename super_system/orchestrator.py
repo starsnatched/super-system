@@ -23,7 +23,7 @@ from claude_agent_sdk import (
 
 from super_system import prompts
 from super_system.agents import build_agents
-from super_system.cleanup import STALL_TIMEOUT_S, kill_descendant_processes
+from super_system.cleanup import STALL_TIMEOUT_S, has_active_descendants, kill_descendant_processes
 from super_system.config import load_api_key, load_skill_registries
 from super_system.skills import SKILL_TOOL_NAMES, auto_discover, create_skills_mcp_server
 
@@ -156,11 +156,19 @@ async def run(
     stalled = False
 
     async def _watchdog() -> None:
-        nonlocal stalled
+        nonlocal stalled, last_activity
         while True:
             await asyncio.sleep(30)
             idle = time.monotonic() - last_activity
             if idle > STALL_TIMEOUT_S:
+                if has_active_descendants():
+                    logger.debug(
+                        "No stream activity for %.0fs but descendant processes "
+                        "still running — resetting stall timer",
+                        idle,
+                    )
+                    last_activity = time.monotonic()
+                    continue
                 logger.warning(
                     "Pipeline stalled (no activity for %.0fs), interrupting",
                     idle,

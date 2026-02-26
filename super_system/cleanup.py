@@ -95,6 +95,11 @@ def kill_descendant_processes(pid: int | None = None) -> None:
                 pass
 
 
+def has_active_descendants(pid: int | None = None) -> bool:
+    target = pid if pid is not None else _main_pid or os.getpid()
+    return len(_get_descendant_pids(target)) > 0
+
+
 def register_cleanup() -> None:
     global _registered, _main_pid
     if _registered:

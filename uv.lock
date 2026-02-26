@@ -694,6 +694,7 @@ source = { editable = "." }
 dependencies = [
     { name = "claude-agent-sdk" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "rich" },
     { name = "textual" },
     { name = "uvicorn", extra = ["standard"] },
@@ -703,6 +704,7 @@ dependencies = [
 requires-dist = [
     { name = "claude-agent-sdk", specifier = ">=0.1.37" },
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "rich", specifier = ">=13.9" },
     { name = "textual", specifier = ">=1.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34" },

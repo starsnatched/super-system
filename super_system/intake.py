@@ -23,7 +23,7 @@ from claude_agent_sdk import (
 
 from super_system import prompts
 from super_system.agents import BROWSER_TOOLS
-from super_system.cleanup import STALL_TIMEOUT_S, kill_descendant_processes
+from super_system.cleanup import STALL_TIMEOUT_S, has_active_descendants, kill_descendant_processes
 
 _IS_WINDOWS = sys.platform == "win32"
 
@@ -117,10 +117,19 @@ async def _run_turn(
     parent_task = asyncio.current_task()
 
     async def _watchdog() -> None:
+        nonlocal last_activity
         while True:
             await asyncio.sleep(30)
             idle = time.monotonic() - last_activity
             if idle > STALL_TIMEOUT_S:
+                if has_active_descendants():
+                    logger.debug(
+                        "No stream activity for %.0fs but descendant processes "
+                        "still running — resetting stall timer",
+                        idle,
+                    )
+                    last_activity = time.monotonic()
+                    continue
                 logger.warning(
                     "Intake stalled (no activity for %.0fs), interrupting",
                     idle,

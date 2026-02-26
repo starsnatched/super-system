@@ -144,6 +144,7 @@ async def run(
         model="opus",
         setting_sources=["user", "project"],
         mcp_servers={"skills": skills_server},
+        max_buffer_size=50 * 1024 * 1024,
         extra_args={"chrome": None},
     )
 

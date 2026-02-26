@@ -82,6 +82,7 @@ def _build_options(
         ] + BROWSER_TOOLS,
         permission_mode="bypassPermissions",
         model="opus",
+        max_buffer_size=50 * 1024 * 1024,
         extra_args={"chrome": None},
     )
 

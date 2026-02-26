@@ -50,7 +50,7 @@ async def interrupt() -> dict[str, str]:
 async def _send(ws: WebSocket, event: dict[str, Any]) -> None:
     try:
         await ws.send_json(event)
-    except Exception:
+    except (Exception, asyncio.CancelledError):
         pass
 
 

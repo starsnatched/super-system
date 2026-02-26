@@ -94,6 +94,7 @@ async def run(
     cb.on_banner()
 
     loop = asyncio.get_running_loop()
+    run_task = asyncio.current_task()
     interrupted = False
 
     if handle_signals:
@@ -103,8 +104,8 @@ async def run(
             if interrupted:
                 raise SystemExit(128 + sig)
             interrupted = True
-            for task in asyncio.all_tasks(loop):
-                task.cancel()
+            if run_task is not None:
+                run_task.cancel()
 
         if _IS_WINDOWS:
             signal.signal(signal.SIGINT, _handle_signal)
@@ -165,8 +166,8 @@ async def run(
                     idle,
                 )
                 stalled = True
-                for task in asyncio.all_tasks(loop):
-                    task.cancel()
+                if run_task is not None:
+                    run_task.cancel()
                 return
 
     watchdog_task = asyncio.create_task(_watchdog())

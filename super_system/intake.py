@@ -114,7 +114,7 @@ async def _run_turn(
     collected_text: list[str] = []
     captured_session_id = session_id
     last_activity = time.monotonic()
-    loop = asyncio.get_running_loop()
+    parent_task = asyncio.current_task()
 
     async def _watchdog() -> None:
         while True:
@@ -125,8 +125,8 @@ async def _run_turn(
                     "Intake stalled (no activity for %.0fs), interrupting",
                     idle,
                 )
-                for task in asyncio.all_tasks(loop):
-                    task.cancel()
+                if parent_task is not None:
+                    parent_task.cancel()
                 return
 
     watchdog_task = asyncio.create_task(_watchdog())
@@ -134,28 +134,33 @@ async def _run_turn(
     try:
         async for message in query(prompt=_as_stream(prompt_text), options=options):
             last_activity = time.monotonic()
-            if isinstance(message, SystemMessage):
-                if hasattr(message, "subtype") and message.subtype == "init":
-                    sid = (
-                        message.data.get("session_id")
-                        if isinstance(message.data, dict)
-                        else None
-                    )
-                    if sid:
-                        captured_session_id = sid
-            elif isinstance(message, AssistantMessage):
-                for block in message.content:
-                    if isinstance(block, TextBlock):
-                        collected_text.append(block.text)
-                        cb.on_text(block.text)
-                    elif isinstance(block, ToolUseBlock):
-                        desc = ""
-                        if isinstance(block.input, dict):
-                            desc = block.input.get("description", "")
-                        cb.on_tool_use(block.name, desc)
-            elif isinstance(message, ResultMessage):
-                if message.is_error:
-                    logger.warning("Intake turn error: %s", message.result)
+            try:
+                if isinstance(message, SystemMessage):
+                    if hasattr(message, "subtype") and message.subtype == "init":
+                        sid = (
+                            message.data.get("session_id")
+                            if isinstance(message.data, dict)
+                            else None
+                        )
+                        if sid:
+                            captured_session_id = sid
+                elif isinstance(message, AssistantMessage):
+                    for block in message.content:
+                        if isinstance(block, TextBlock):
+                            collected_text.append(block.text)
+                            cb.on_text(block.text)
+                        elif isinstance(block, ToolUseBlock):
+                            desc = ""
+                            if isinstance(block.input, dict):
+                                desc = block.input.get("description", "")
+                            cb.on_tool_use(block.name, desc)
+                elif isinstance(message, ResultMessage):
+                    if message.is_error:
+                        logger.warning("Intake turn error: %s", message.result)
+            except (asyncio.CancelledError, KeyboardInterrupt):
+                raise
+            except Exception as exc:
+                logger.warning("Error processing intake message: %s", exc, exc_info=True)
     finally:
         watchdog_task.cancel()
         with suppress(asyncio.CancelledError):
@@ -175,6 +180,7 @@ async def run_intake(
     cb = callbacks or IntakeCallbacks()
 
     loop = asyncio.get_running_loop()
+    intake_task = asyncio.current_task()
     interrupted = False
 
     if handle_signals:
@@ -184,8 +190,8 @@ async def run_intake(
             if interrupted:
                 raise SystemExit(128 + sig)
             interrupted = True
-            for task in asyncio.all_tasks(loop):
-                task.cancel()
+            if intake_task is not None:
+                intake_task.cancel()
 
         if _IS_WINDOWS:
             signal.signal(signal.SIGINT, _handle_signal)

@@ -133,6 +133,83 @@ ok "Installed"
 npm_global_install "memex-cli" "memex-cli"
 npm_global_install "@google/gemini-cli" "gemini"
 
+# --- Initialize UX design skill (Gemini API key) ---
+
+CONFIG_DIR="${HOME}/.config/super-system"
+CONFIG_FILE="${CONFIG_DIR}/config.json"
+
+read_config_key() {
+    local key="$1"
+    if [ -f "${CONFIG_FILE}" ]; then
+        python3 -c "import json,sys; c=json.load(open('${CONFIG_FILE}')); print(c.get('${key}',''))" 2>/dev/null || echo ""
+    else
+        echo ""
+    fi
+}
+
+write_config_key() {
+    local key="$1"
+    local value="$2"
+    mkdir -p "${CONFIG_DIR}"
+    if [ -f "${CONFIG_FILE}" ]; then
+        python3 -c "
+import json, sys
+with open('${CONFIG_FILE}') as f: c = json.load(f)
+c['${key}'] = '${value}'
+with open('${CONFIG_FILE}', 'w') as f: json.dump(c, f, indent=2)
+" 2>/dev/null
+    else
+        printf '{\n  "%s": "%s"\n}\n' "${key}" "${value}" > "${CONFIG_FILE}"
+    fi
+}
+
+GEMINI_CONFIGURED=false
+
+if [ -n "${GEMINI_API_KEY:-}" ]; then
+    ok "GEMINI_API_KEY already set in environment"
+    GEMINI_CONFIGURED=true
+elif [ -n "$(read_config_key gemini_api_key)" ]; then
+    ok "Gemini API key already configured in ${CONFIG_FILE}"
+    GEMINI_CONFIGURED=true
+fi
+
+if [ "${GEMINI_CONFIGURED}" = false ]; then
+    printf '\n'
+    info "UX Design Skill Setup (ux-design-gemini)"
+    printf '  The UX design skill uses Google Gemini for design generation.\n'
+    printf '  You can authenticate via API key or Google OAuth.\n\n'
+    printf '  \033[1m1)\033[0m Enter a Gemini API key (get one at https://aistudio.google.com/apikey)\n'
+    printf '  \033[1m2)\033[0m Skip — authenticate later by running \033[1mgemini\033[0m or setting GEMINI_API_KEY\n\n'
+
+    if [ -t 0 ]; then
+        printf '  Gemini API key (or press Enter to skip): '
+        read -r GEMINI_KEY_INPUT
+        if [ -n "${GEMINI_KEY_INPUT}" ]; then
+            write_config_key "gemini_api_key" "${GEMINI_KEY_INPUT}"
+            ok "Gemini API key saved to ${CONFIG_FILE}"
+
+            SHELL_NAME="$(basename "${SHELL}")"
+            case "${SHELL_NAME}" in
+                zsh)  RC="${HOME}/.zshrc" ;;
+                bash) RC="${HOME}/.bashrc" ;;
+                *)    RC="" ;;
+            esac
+            if [ -n "${RC}" ] && [ -f "${RC}" ]; then
+                if ! grep -q 'GEMINI_API_KEY' "${RC}" 2>/dev/null; then
+                    printf '\nexport GEMINI_API_KEY="%s"\n' "${GEMINI_KEY_INPUT}" >> "${RC}"
+                    ok "GEMINI_API_KEY added to ${RC}"
+                fi
+            fi
+            GEMINI_CONFIGURED=true
+        else
+            warn "Skipped — set up Gemini auth later"
+        fi
+    else
+        warn "Non-interactive shell — skipping Gemini API key prompt"
+        warn "Set GEMINI_API_KEY or run: gemini (OAuth login)"
+    fi
+fi
+
 # --- PATH setup ---
 
 if ! echo "${PATH}" | grep -q "${HOME}/.local/bin"; then
@@ -156,8 +233,12 @@ fi
 
 printf '\n\033[1;32msuper-system is ready.\033[0m\n'
 printf '  Run \033[1msuper-system\033[0m from any directory to launch the TUI.\n'
-printf '  Your API key will be prompted on first launch.\n'
-if command_exists gemini; then
-    printf '  Run \033[1mgemini\033[0m once to authenticate with Google for the UX design skill.\n'
+printf '  Your Anthropic API key will be prompted on first launch.\n'
+if [ "${GEMINI_CONFIGURED}" = true ]; then
+    ok "UX design skill (ux-design-gemini) is configured and ready"
+else
+    printf '  To enable the UX design skill, do one of:\n'
+    printf '    • Run \033[1mgemini\033[0m to authenticate via Google OAuth (free)\n'
+    printf '    • Set \033[1mGEMINI_API_KEY\033[0m in your environment\n'
 fi
 printf '\n'

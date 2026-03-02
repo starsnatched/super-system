@@ -19,28 +19,28 @@ Analyze design task scope:
 
 | Scope | Trigger | Action |
 |-------|---------|--------|
-| **Single** | 1 个页面/组件 | 直接执行 |
-| **Multi-page** | 多个页面 | 任务分解 |
-| **Multi-stage** | 研究→定义→原型 | 依赖分析 |
-| **Design System** | 完整设计体系 | 分解 + 依赖 |
+| **Single** | 1 page/component | Execute directly |
+| **Multi-page** | Multiple pages | Task decomposition |
+| **Multi-stage** | Research → Define → Prototype | Dependency analysis |
+| **Design System** | Complete design system | Decomposition + dependency analysis |
 
 **Output**: Scope type with reasoning.
 
 ### Step 2: Task Decomposition (Multi-page/System MANDATORY)
 
-**Required when**: 任务涉及 ≥2 个页面或组件
+**Required when**: Task involves ≥2 pages or components
 
 Claude MUST decompose the task:
-1. 识别所有设计交付物
-2. 拆分为独立设计任务
-3. 分配唯一 task ID
-4. 建立依赖关系（如有）
+1. Identify all design deliverables
+2. Split into independent design tasks
+3. Assign a unique task ID to each
+4. Establish dependency relationships (if any)
 
 **Skip condition**: Only if task is truly atomic (single page, single component)
 
 ### Step 3: Dependency Analysis (Multi-stage MANDATORY)
 
-**Required when**: 设计流程跨多个阶段
+**Required when**: Design process spans multiple stages
 
 Design stage dependency chain:
 ```
@@ -64,46 +64,46 @@ Claude MUST resolve workdir to project root:
 git rev-parse --show-toplevel
 ```
 
-**Rule**: `workdir` = Git 项目根目录（绝对路径）
+**Rule**: `workdir` = Git project root directory (absolute path)
 
 ### Step 5: Execution Plan Report (ALL Tasks)
 
 Claude MUST report to user before execution:
 
 ```markdown
-## 📋 设计执行计划
+## Design Execution Plan
 
-### 范围分析
-- **类型**: [Single/Multi-page/Multi-stage/Design System]
-- **交付物**: [列表]
+### Scope Analysis
+- **Type**: [Single/Multi-page/Multi-stage/Design System]
+- **Deliverables**: [list]
 
-### 任务分解 (如适用)
-| ID | 设计任务 | 依赖 |
-|----|----------|------|
+### Task Decomposition (if applicable)
+| ID | Design Task | Dependencies |
+|----|-------------|--------------|
 | design-1 | [desc] | - |
 | design-2 | [desc] | design-1 |
 
-### 依赖图 (如适用)
+### Dependency Graph (if applicable)
 ```
 Phase 1: [design-1] [design-2]
 Phase 2: [design-3 depends on 1,2]
 ```
 
-### 执行摘要
+### Execution Summary
 - **Workdir**: /path/to/project
-- **子任务数**: N
-- **并行组**: M
+- **Subtask count**: N
+- **Parallel groups**: M
 ```
 
 ### Pre-Execution Checklist
 
 Before invoking memex-cli, Claude MUST confirm:
 
-- [ ] ✅ 范围分析完成 (Single/Multi-page/Multi-stage/System)
-- [ ] ✅ (多页面/系统) 任务已分解
-- [ ] ✅ (多阶段) 依赖已分析
-- [ ] ✅ Workdir 已解析 (via git root)
-- [ ] ✅ 执行计划已报告给用户
+- [ ] Scope analysis complete (Single/Multi-page/Multi-stage/System)
+- [ ] (Multi-page/System) Tasks decomposed
+- [ ] (Multi-stage) Dependencies analyzed
+- [ ] Workdir resolved (via git root)
+- [ ] Execution plan reported to user
 
 **⛔ VIOLATION**: Directly passing multi-page/system task to Gemini without decomposition is a protocol violation.
 
@@ -149,7 +149,7 @@ id: user-flow
 backend: gemini
 workdir: /path/to/project
 ---CONTENT---
-设计一个电商App的用户购物流程，包含浏览、加购、结算、支付的完整流程图
+Design a complete user shopping flow for an e-commerce app, including browsing, adding to cart, checkout, and payment
 ---END---
 EOF
 ```
@@ -163,7 +163,7 @@ id: wireframe
 backend: gemini
 workdir: /path/to/project
 ---CONTENT---
-为登录注册页面创建线框图规格说明，包含布局、组件位置、交互状态
+Create wireframe specifications for login and registration pages, including layout, component placement, and interaction states
 ---END---
 EOF
 ```
@@ -177,7 +177,7 @@ id: component-system
 backend: gemini
 workdir: /path/to/project
 ---CONTENT---
-设计一套移动端UI组件规范，包含按钮、输入框、卡片、导航栏的样式定义
+Design a mobile UI component specification including buttons, input fields, cards, and navigation bar style definitions
 ---END---
 EOF
 ```
@@ -194,7 +194,7 @@ memex-cli run --stdin <<'EOF'
 id: personas
 backend: gemini
 ---CONTENT---
-为健身App创建3个用户画像，包含目标、痛点、使用场景
+Create 3 user personas for a fitness app, including goals, pain points, and usage scenarios
 ---END---
 EOF
 ```
@@ -211,7 +211,7 @@ memex-cli run --stdin <<'EOF'
 id: sitemap
 backend: gemini
 ---CONTENT---
-为SaaS项目管理工具设计站点地图和导航结构
+Design a sitemap and navigation structure for a SaaS project management tool
 ---END---
 EOF
 ```
@@ -228,7 +228,7 @@ memex-cli run --stdin <<'EOF'
 id: wireframe-specs
 backend: gemini
 ---CONTENT---
-创建移动端外卖App关键页面的低保真线框图规格（首页、商家详情、购物车）
+Create low-fidelity wireframe specs for key pages of a mobile food delivery app (home, restaurant detail, shopping cart)
 ---END---
 EOF
 ```
@@ -245,7 +245,7 @@ memex-cli run --stdin <<'EOF'
 id: design-system
 backend: gemini
 ---CONTENT---
-创建设计系统文档：色彩系统、字体规范、间距体系、组件库
+Create design system documentation: color system, typography specs, spacing system, and component library
 ---END---
 EOF
 ```
@@ -264,7 +264,7 @@ backend: gemini
 files: ./dashboard.png
 files-mode: embed
 ---CONTENT---
-使用Nielsen's 10 Heuristics评估这个仪表板设计
+Evaluate this dashboard design using Nielsen's 10 Heuristics
 ---END---
 EOF
 ```
@@ -287,11 +287,11 @@ backend: gemini
 files: ./mockup.png
 files-mode: embed        # Required for image analysis
 ---CONTENT---
-审查这个设计稿：
-1. 视觉层次是否清晰
-2. 色彩对比度是否符合WCAG AA标准
-3. 组件布局是否合理
-4. 留白和间距是否恰当
+Review this design mockup:
+1. Is the visual hierarchy clear?
+2. Does the color contrast meet WCAG AA standards?
+3. Is the component layout reasonable?
+4. Is the whitespace and spacing appropriate?
 ---END---
 EOF
 ```
@@ -308,7 +308,7 @@ backend: gemini
 files: ./v1-home.png, ./v2-home.png
 files-mode: embed
 ---CONTENT---
-对比这两个版本的首页设计，分析改进之处和潜在问题
+Compare these two versions of the homepage design, analyze improvements and potential issues
 ---END---
 EOF
 ```
@@ -323,7 +323,7 @@ backend: gemini
 files: ./our-app.png, ./competitor-a.png, ./competitor-b.png
 files-mode: embed
 ---CONTENT---
-对比分析我们的App与竞品的设计：布局、视觉风格、交互模式
+Perform a comparative analysis of our app against competitors: layout, visual style, and interaction patterns
 ---END---
 EOF
 ```
@@ -354,7 +354,7 @@ memex-cli run --stdin <<'EOF'
 id: research
 backend: gemini
 ---CONTENT---
-用户研究
+User research
 ---END---
 
 ---TASK---
@@ -362,7 +362,7 @@ id: architecture
 backend: gemini
 dependencies: research
 ---CONTENT---
-信息架构设计
+Information architecture design
 ---END---
 
 ---TASK---
@@ -370,7 +370,7 @@ id: wireframe
 backend: gemini
 dependencies: architecture
 ---CONTENT---
-线框图规格
+Wireframe specifications
 ---END---
 EOF
 ```

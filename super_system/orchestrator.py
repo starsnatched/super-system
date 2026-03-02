@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import signal
 import sys
 import time
@@ -24,7 +25,7 @@ from claude_agent_sdk import (
 from super_system import prompts
 from super_system.agents import build_agents
 from super_system.cleanup import STALL_TIMEOUT_S, has_active_descendants, kill_descendant_processes
-from super_system.config import load_api_key, load_skill_registries
+from super_system.config import load_api_key, load_gemini_api_key, load_skill_registries
 from super_system.skills import SKILL_TOOL_NAMES, auto_discover, create_skills_mcp_server, ensure_bundled_skills
 
 _IS_WINDOWS = sys.platform == "win32"
@@ -117,6 +118,10 @@ async def run(
     effective_cwd = cwd or Path.cwd()
     api_key = load_api_key()
     registry_urls = load_skill_registries()
+
+    gemini_key = load_gemini_api_key()
+    if gemini_key and "GEMINI_API_KEY" not in os.environ:
+        os.environ["GEMINI_API_KEY"] = gemini_key
 
     bundled = ensure_bundled_skills(effective_cwd)
     if bundled:

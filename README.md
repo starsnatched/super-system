@@ -4,13 +4,19 @@ Multi-agent software engineering team powered by Claude. Describe what you want 
 
 ## Quick install
 
-One command — installs `uv` if needed, clones the repo, and puts `super-system` on your PATH:
+One command — installs `uv`, `npm`, `memex-cli`, and `gemini-cli` if needed, clones the repo, and puts `super-system` on your PATH:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/starsnatched/super-system/main/install.sh | bash
 ```
 
-Your API key will be prompted on first launch and saved to `~/.config/super-system/config.json`.
+The installer automatically sets up:
+- **uv** — Python toolchain and package manager
+- **npm** — Node.js package manager (via nvm or Homebrew if not present)
+- **memex-cli** — AI task orchestration CLI (used by the UX design skill)
+- **@google/gemini-cli** — Google's Gemini CLI (used for UX design generation)
+
+Your Anthropic API key will be prompted on first launch and saved to `~/.config/super-system/config.json`. To configure the Gemini API key for UX design features, either set `GEMINI_API_KEY` in your environment or add `"gemini_api_key"` to the config file. Alternatively, run `gemini` once to authenticate via Google OAuth (free tier, no key needed).
 
 ### Prerequisites
 
@@ -24,6 +30,7 @@ Your API key will be prompted on first launch and saved to `~/.config/super-syst
 ```bash
 git clone https://github.com/starsnatched/super-system.git
 uv tool install --editable ./super-system
+npm install -g memex-cli @google/gemini-cli
 ```
 
 ## Usage

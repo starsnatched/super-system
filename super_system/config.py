@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 _CONFIG_DIR = Path.home() / ".config" / "super-system"
@@ -38,4 +39,14 @@ def load_skill_registries() -> list[str]:
 def save_skill_registries(urls: list[str]) -> None:
     config = _load_config()
     config["skill_registries"] = urls
+    _save_config(config)
+
+
+def load_gemini_api_key() -> str:
+    return os.environ.get("GEMINI_API_KEY", "") or _load_config().get("gemini_api_key", "")
+
+
+def save_gemini_api_key(key: str) -> None:
+    config = _load_config()
+    config["gemini_api_key"] = key
     _save_config(config)

@@ -13,10 +13,35 @@ logger = logging.getLogger("super_system.skills.manager")
 
 _HTTP_TIMEOUT = 30.0
 _RELEVANCE_THRESHOLD = 0.4
+_BUNDLED_DIR = Path(__file__).parent / "bundled"
 
 
 def _skills_dir(cwd: Path) -> Path:
     return cwd / ".claude" / "skills"
+
+
+def ensure_bundled_skills(cwd: Path) -> list[str]:
+    installed: list[str] = []
+    if not _BUNDLED_DIR.is_dir():
+        return installed
+
+    target_base = _skills_dir(cwd)
+    for entry in sorted(_BUNDLED_DIR.iterdir()):
+        if not entry.is_dir():
+            continue
+        src = entry / "SKILL.md"
+        if not src.is_file():
+            continue
+        dest_dir = target_base / entry.name
+        dest_file = dest_dir / "SKILL.md"
+        if dest_file.is_file():
+            continue
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest_file)
+        logger.info("Deployed bundled skill %s to %s", entry.name, dest_file)
+        installed.append(entry.name)
+
+    return installed
 
 
 def _parse_frontmatter(text: str) -> dict[str, str]:

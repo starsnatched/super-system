@@ -17,6 +17,9 @@ dependencies = [
 super-system = "super_system.cli:main"
 super-system-server = "super_system.server:main"
 
+[tool.hatch.build.targets.wheel]
+packages = ["super_system"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

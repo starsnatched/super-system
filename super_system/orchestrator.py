@@ -25,7 +25,7 @@ from super_system import prompts
 from super_system.agents import build_agents
 from super_system.cleanup import STALL_TIMEOUT_S, has_active_descendants, kill_descendant_processes
 from super_system.config import load_api_key, load_skill_registries
-from super_system.skills import SKILL_TOOL_NAMES, auto_discover, create_skills_mcp_server
+from super_system.skills import SKILL_TOOL_NAMES, auto_discover, create_skills_mcp_server, ensure_bundled_skills
 
 _IS_WINDOWS = sys.platform == "win32"
 
@@ -117,6 +117,10 @@ async def run(
     effective_cwd = cwd or Path.cwd()
     api_key = load_api_key()
     registry_urls = load_skill_registries()
+
+    bundled = ensure_bundled_skills(effective_cwd)
+    if bundled:
+        logger.info("Deployed bundled skills: %s", bundled)
 
     try:
         installed = await auto_discover(
